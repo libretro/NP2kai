@@ -253,11 +253,10 @@ else ifeq ($(platform), psp1)
 	PLATFORM_DEFINES += -march=allegrex -mfp32 -mgp32 -mlong32 -mabi=eabi
 	PLATFORM_DEFINES += -fomit-frame-pointer -fstrict-aliasing
 	PLATFORM_DEFINES += -falign-functions=32 -falign-loops -falign-labels -falign-jumps
-	PLATFORM_DEFINES += -I$(PSPDEV)/psp/sdk/include
+	PLATFORM_DEFINES += -I$(shell psp-config --pspsdk-path)/include
 	STATIC_LINKING=1
 	DISABLE_GCC_SECURITY_FLAGS = 1
 	SUPPORT_NP2_THREAD = 0
-	SUPPORT_NP2_TICKCOUNT = 0
 
 # Vita
 else ifeq ($(platform), vita)
