@@ -7,6 +7,7 @@
 
 #if defined(__LIBRETRO__)
 #include <libretro.h>
+#include <retro_endianness.h>
 #endif
 
 // secure
