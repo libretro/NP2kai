@@ -313,7 +313,18 @@ struct tagNP2Config
 	UINT8	gameport; // 118音源のゲームポートを使用する
 #endif
 
+#if defined(SUPPORT_DEBUGSS)
 	UINT8	debugss;
+#endif
+
+#if defined(SUPPORT_VIDEOFILTER)
+	BOOL     vf1_enable;
+	BOOL     vf1_bmponly;
+	uint8_t  vf1_pcount;
+	uint8_t  vf1_pno;
+	uint8_t  vf1_profile[3][2];
+	uint32_t vf1_param[3][3][8];
+#endif
 };
 typedef struct tagNP2Config  NP2CFG;		/*!< The define of config */
 

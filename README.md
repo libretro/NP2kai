@@ -1,5 +1,5 @@
 # Neko Project II 0.86 kai
-May 17, 2020<br>
+Jul 14, 2020<br>
 
 NP2kai is PC-9801 series emulator<br>
 
@@ -68,6 +68,9 @@ $ ./libretro-build-ios.sh np2kai
 2. Locate BIOS files to np2kai in libretro's system directory (libretro/system/np2kai).
 
 NP2 menu is shown F12 or mouse middle button or L2, to swap FDD/HDD diskimages.
+
+On Android, Game Files are need to locate in '/storage/emulated/0/RetroArch' by access rights reason.
+Game Files cannot locate on external storage.
 </div></details>
 
 ### VisualStudio 2019
@@ -197,6 +200,13 @@ $ make install
 
 ### X with GTK2 and SDL
 
+
+#### Arch Linux
+
+For the [latest release](https://github.com/AZO234/NP2kai/releases), a package can be found in the [AUR](https://aur.archlinux.org/packages/xnp2kai-azo234/)
+
+Fonts are **NOT** included in the AUR package.
+
 *temporary*<br>
 It seems slow xnp2kai's dialog now, on Ubuntu GNOME.<br>
 (Maybe GTK issue. No problem on Ubuntu MATE.)<br>
@@ -211,8 +221,16 @@ X with GTK2 and SDL
 
 #### Install tools
 1. Run follow command.
+
+- Debian/Ubuntu series
 ```
-$ sudo apt install git cmake ninja-build build-essential libx11-dev libglib2.0-dev libgtk2.0-dev libsdl2-dev libsdl2-mixer-dev libsdl2-ttf-dev libsdl1.2-dev libsdl-mixer1.2-dev libsdl-ttf2.0-dev  libusb-1.0-0-dev libssl-dev
+$ sudo apt install git cmake ninja-build build-essential libx11-dev libglib2.0-dev libgtk2.0-dev libsdl2-dev libsdl2-mixer-dev libsdl2-ttf-dev libsdl1.2-dev libsdl-mixer1.2-dev libsdl-ttf2.0-dev  libusb-1.0-0-dev libfreetype-dev libfontconfig1-dev libssl-dev
+```
+
+- Fedora series
+```
+$ sudo dnf groupinstall "Development Tools"
+$ sudo dnf install gcc-c++ cmake libusb-devel SDL-devel SDL_mixer-devel SDL_ttf-devel SDL2-devel SDL2_mixer-devel SDL2_ttf-devel gtk2-devel libX11-devel fontconfig-devel freetype-devel
 ```
 
 #### Build
@@ -327,10 +345,10 @@ $ emrun <Emscripten NP2kai filename>.html
 ```
 </div></details>
 
-### OpenDigux
+### OpenDingux
 
 <details><summary>
-OpenDigux
+OpenDingux
 </summary><div>
 
 #### Install tools
@@ -338,6 +356,7 @@ OpenDigux
 1. Install host toolchain to /opt/gcw0-toolchain with [buildroot](https://github.com/OpenDingux/buildroot).
 - RG350
 1. Install host toolchain to /opt/rg350-toolchain with [RG350_buildroot](https://github.com/tonyjih/RG350_buildroot).
+2. [patch](https://raw.githubusercontent.com/AZO234/RAcross_linux/master/RG350_buildroot.patch).
 - RS90
 1. Install host toolchain to /opt/rs90-toolchain with [buildroot](https://github.com/OpenDingux/buildroot).
 
@@ -442,7 +461,7 @@ sudo apt install 'fonts-takao-*'
 ```
 and
 ```
-ls -n /usr/share/fonts/truetype/takao-gothic/TakaoGothic.ttf BIOSdirectory/default.ttf'
+ln -s /usr/share/fonts/truetype/takao-gothic/TakaoGothic.ttf BIOSdirectory/default.ttf'
 ```
 Already exist 'font.tmp', delete this.<br>
 And start NP2kai.<br>
@@ -496,6 +515,11 @@ Using mouse (Joypad mouse mode)
 </summary><div>
 
 Mouse cursor moving is always enable with mouse on PC.<br>
+
+If mouse cannot use on a game,<br>
+check mouse driver for the game or included in MS-DOS is loaded by CONFIG.SYS.<br>
+(Or MS-DOS's mouse driver inhibit the game only mouse driver.)<br>
+<code>DEVICE=A:&yen;DOS&yen;MOUSE.SYS</code>
 
 Mouse cursor moving and left-button be able to controled with joypad stick.<br>
 Switch Stick2Mouse mode in config to 'L-stick' or 'R-stick(default)'.<br>
@@ -566,6 +590,8 @@ Tuning performance
   Change "CPU Clock Multiplyer".
 - Memory size
   Change "RAM Size".
+  - MS-DOS 5 or older : lower 16.6MB
+  - MS-DOS 6 : lower 64.6MB
 - Sound device
   - 26K: for old games.
   - 86: for newer games.
@@ -762,15 +788,11 @@ Using CD-ROM drive
 </summary><div>
 
 To use CD drive with MS-DOS 6.2,<br>
-write follow to CONFIG.SYS.
-```
-LASTDRIVE=Z
-DEVICE=A:￥DOS￥NECCDD.SYS /D:CD_101
-```
-And write follow to AUTOEXEC.BAT.
-```
-A:￥DOS￥MSCDEX.EXE /D:CD_101 /L:Q
-```
+write follow to CONFIG.SYS.<br>
+<code>LASTDRIVE=Z</code><br>
+<code>DEVICE=A:&yen;DOS&yen;NECCDD.SYS /D:CD_101</code><br>
+And write follow to AUTOEXEC.BAT.<br>
+<code>A:&yen;DOS&yen;MSCDEX.EXE /D:CD_101 /L:Q</code><br>
 Then, you'll can use CD drive as Q drive.
 </div></details>
 
@@ -843,6 +865,111 @@ Then we can use follow types HDD image files.<br>
 </div></details>
 
 <details><summary>
+Text editor
+</summary><div>
+
+MS-DOS for PC-9801 include 'SEDIT.EXE' text editor.<br>
+Also there is 'VZ Editor' product.
+</div></details>
+
+<details><summary>
+About LHA(lzh) archived file
+</summary><div>
+
+File has extention '.lzh' is compressed file by [LHA](https://www.vector.co.jp/soft/dos/util/se002413.html).<br>
+If to extract only, you can use [LHE](https://www.vector.co.jp/soft/dos/util/se017776.html).
+</div></details>
+
+<details><summary>
+File manager
+</summary><div>
+
+To file management, you can use [FILMTN](https://www.vector.co.jp/soft/dos/util/se001385.html) and [LHMTN](https://www.vector.co.jp/soft/dos/util/se001396.html),<br>
+or [FD](https://www.vector.co.jp/soft/dos/util/se000010.html).<br>
+</div></details>
+
+<details><summary>
+Memory driver
+</summary><div>
+
+When start PC-98, memory amount is displaied.
+```
+MEMORY 640KB + 13312KB
+```
+640KB is conventional memory.<br>
+(For example) 13312KB is extnded memory.
+
+Extnded memory is use as XMS(eXtended Memory Specification)<br>
+by HIMEM.SYS is written in CONFIG.SYS.<br>
+<code>DEVICE=A:&yen;DOS&yen;HIMEM.SYS</code><br>
+Drivers and daemons can be loaded on XMB.<br>
+(But EMM386.EXE, SMARTDRV.EXE, NECCD*.SYS cannot be loaded on XMB.)<br>
+<code>DEVICEHIGH=A:&yen;DOS&yen;MOUSE.SYS</code><br>
+<code>DEVICEHIGH=A:&yen;DOS&yen;RAMDISK.SYS /X 1536</code><br>
+8086 or V30 can use HMA(448KB XMS).<br>
+i286 or later,<br>
+MS-DOS 5 or older can use lower 16MB XMS.<br>
+MS-DOS 6 can use lower 64MB XMS.
+
+XMB can use as UMB(386KB), EMB by<br>
+EMM386.EXE(old EMM386.SYS) is written in CONFIG.SYS.<br>
+<code>DEVICE=A:&yen;DOS&yen;EMM386.EXE /P=64 /UMB /DPMI</code><br>
+'/P=64' means using EMS 64page (1page=16KB).<br>
+'/DPMI' means with DPMI support.
+
+Normaly, MS-DOS is located on conventional memory.<br>
+You can use XMB and UMB, DOS can be located on them,
+```
+DOS=HIGH,UMB
+```
+
+If you use upper 64MB XMB,<br>
+you can use [VEM486](https://www.vector.co.jp/soft/dos/hardware/se025675.html) (deposit software)<br>
+instead of HIMEM.SYS and EMM386.EXE.<br>
+<code>DEVICE=A:&yen;VEM486&yen;VEM486.EXE</code>
+</div></details>
+
+<details><summary>
+Running Turbo C++ 4.0
+</summary><div>
+
+To run Turbo C++ 4.0, use HIMEM.SYS only.
+</div></details>
+
+<details><summary>
+Running NASM
+</summary><div>
+
+To run NASM, use DPMI(HIMEM.SYS + EMM386.EXE + DPMI option).<br>
+And before run NASM, set swap follow command.<br>
+<code>A:&yen;NASM&yen;CWSDPMI.EXE -S A:&yen;NASM&yen;CWSDPMI.SWP</code>
+
+CWSDPMI.EXE is loaded on memory continuous.<br>
+<code>A:&yen;NASM&yen;CWSDPMI.EXE -P -S A:&yen;NASM&yen;CWSDPMI.SWP</code><br>
+To free<br>
+<code>A:&yen;NASM&yen;CWSDPMI.EXE -U</code><br>
+</div></details>
+
+<details><summary>
+Using linker
+</summary><div>
+
+I think better linker is genarate 16bit executable one.<br>
+(Ex.LNK563)<br>
+if Not careful, you can use MASM's linker.<br>
+</div></details>
+
+<details><summary>
+About MS-C
+</summary><div>
+
+When MS-C ver.5 is released, users use MS-DOS 3.0.<br>
+MS-C ver.6 is worked on Windows DOS prompt only.<br>
+Then MS-C is unconvenience to MS-DOS.<br>
+I think Turbo C++ 4.0 is used.
+</div></details>
+
+<details><summary>
 Network Card
 </summary><div>
 
@@ -905,6 +1032,44 @@ This function is used for communication purposes.<br>
 (Probably will be large file, so compression with ZIP<br>
 and be careful hosting when reporting.)
 </div></details>
+
+<details><summary>
+Video filter
+</summary><div>
+To enable and select profile, control by menu.<br>
+Video filter1 have 3 profiles.<br>
+<br>
+A profile include 3 filters.<br>
+Filters are applied in order.<br>
+filter0 -&gt; filter1 -&gt; filter2<br>
+<br>
+Filter's parameters are set to 'vf1_p(profile no)_p(filter no)' to 8 params.
+
+|Param No|Name|value|
+|:---:|:---:|:---:|
+|0|Enable|0:OFF/1:ON|
+|1|Filter Type No|(follow table Filter Type no)|
+|2|Param 0||
+|3|Param 1||
+|4|Param 2||
+|5|Param 3||
+|6|Param 4||
+|7|Param 5||
+
+|Filter Type No|Filter Name|Param 0|Param 1|Param 2|Param 3|Param 4|Param 5|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+|0|THRU|-|-|-|-|-|-|
+|1|NP(Nega/Posi) invert|-|-|-|-|-|-|
+|2|Depth down|0-7:downbits<br>(default 7)|-|-|-|-|-|
+|3|Grey|0-8:Grey depth|0-359:H of white<br>(default 0)|0-255:S of white<br>(default 0)|0-255:V of white<br>(default 255)|-|-|
+|4|V Gamma|1-255:Gamma*10<br>(default 10)|-|-|-|-|-|
+|5|Rotate H|0-359:Rotate H<br>(default 0)|-|-|-|-|-|
+|6|HSV smoothing|5-25:Radius*10<br>(default 5)|1/3/5:Sample count<br>(default 3)|0-180:Merge H diff<br>(default 30)|0-128:Merge S diff<br>(default 30)|0-128:Merge V diff<br>(default 90)|Weight 0:Same/1:Linear/2:Sign<br>(default 0)|
+|7|RGB smoothing|5-25:Radius*10<br>(default 5)|1/3/5:Sample count<br>(default 3)|0-128:Merge R diff<br>(default 30)|0-128:Merge G diff<br>(default 30)|0-128:Merge B diff<br>(default 30)|Weight 0:Same/1:Linear/2:Sign<br>(default 0)|
+
+HSV/RGB smoothing is heavy to work.<br>
+</div></details>
+
 
 #### MIDI sound (X11)
 
@@ -987,6 +1152,16 @@ Next boot computer, you command from 4.
 </div></details>
 
 ## Release
+- Jul 14, 2020
+  - add mouse input off
+- Jun 23, 2020
+  - merge NP21/W rev.75
+- Jun 21, 2020
+  - merge NP21/W rev.74
+- Jun 15, 2020
+  - [not lr] state save/load at first of main loop
+- Jun 12, 2020
+  - Video filter
 - May 22, 2020
   - CMake
   - Emscripten

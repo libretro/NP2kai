@@ -62,6 +62,9 @@
 #include <cbus/smpu98.h>
 #endif
 #include <vram/scrndraw.h>
+#if defined(SUPPORT_VIDEOFILTER)
+#include <vram/videofilter.h>
+#endif
 #include <sound/sound.h>
 #include <sound/beep.h>
 #include <sound/s98.h>
@@ -70,7 +73,9 @@
 #include <timing.h>
 #include <keystat.h>
 #include <debugsub.h>
+#if defined(SUPPORT_DEBUGSS)
 #include <debugsnapshot.h>
+#endif
 #include "subwnd/kdispwnd.h"
 #include "subwnd/mdbgwnd.h"
 #include "subwnd/skbdwnd.h"
@@ -1123,6 +1128,37 @@ static void OnCommand(HWND hWnd, WPARAM wParam)
 			update |= SYS_UPDATECFG;
 			break;
 
+#if defined(SUPPORT_VIDEOFILTER)
+		case IDM_VF1EN:
+			np2cfg.vf1_enable ^= 1;
+			VideoFilter_SetEnable(hVFMng1, np2cfg.vf1_enable);
+			update |= SYS_UPDATECFG;
+			break;
+
+		case IDM_VF1P0:
+			np2cfg.vf1_pno = 0;
+			VideoFilter_SetProfileNo(hVFMng1, 0);
+			update |= SYS_UPDATECFG;
+			break;
+
+		case IDM_VF1P1:
+			np2cfg.vf1_pno = 1;
+			VideoFilter_SetProfileNo(hVFMng1, 1);
+			update |= SYS_UPDATECFG;
+			break;
+
+		case IDM_VF1P2:
+			np2cfg.vf1_pno = 2;
+			VideoFilter_SetProfileNo(hVFMng1, 2);
+			update |= SYS_UPDATECFG;
+			break;
+
+		case IDM_VF1BO:
+			np2cfg.vf1_bmponly ^= 1;
+			update |= SYS_UPDATECFG;
+			break;
+#endif
+
 		case IDM_SCREENOPT:
 			winuienter();
 			dialog_scropt(hWnd);
@@ -1781,6 +1817,7 @@ static void OnCommand(HWND hWnd, WPARAM wParam)
 
 		case IDM_EN_DBSS:
 		{
+#if defined(SUPPORT_DEBUGSS)
 			HMENU hMenu = np2class_gethmenu(g_hWndMain);
 			if (np2cfg.debugss == 0) {
 				np2cfg.debugss = 1;
@@ -1794,6 +1831,7 @@ static void OnCommand(HWND hWnd, WPARAM wParam)
 			DrawMenuBar(hWnd);
 			update |= SYS_UPDATECFG;
 			break;
+#endif
 		}
 
 		case IDM_RESTOREBORDER:
@@ -1921,6 +1959,7 @@ static void OnCommand(HWND hWnd, WPARAM wParam)
 				flagload(hWnd, ext, _T("Status Load"), TRUE);
 			}
 #endif
+#if defined(SUPPORT_DEBUGSS)
 			if ((uID >= IDM_DBSSSAVE0) && (uID <= IDM_DBSSSAVE3))
 			{
 				debugsnapshot_save(uID - IDM_DBSSSAVE0);
@@ -1929,6 +1968,7 @@ static void OnCommand(HWND hWnd, WPARAM wParam)
 			{
 				debugsnapshot_load(uID - IDM_DBSSLOAD0);
 			}
+#endif
 			break;
 	}
 	sysmng_update(update);
@@ -3758,6 +3798,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInst,
 
 	lateframecount = 0;
 	while(1) {
+		if(g_u8ControlState == 1) {
+			statsave_save_d();
+		} else if(g_u8ControlState == 2) {
+			statsave_load_d();
+		}
+		g_u8ControlState = 0;
+
 		if (!np2stopemulate) {
 			if (PeekMessage(&msg, 0, 0, 0, PM_NOREMOVE)) {
 				if (!GetMessage(&msg, NULL, 0, 0)) {

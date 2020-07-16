@@ -3,6 +3,14 @@
 #include	<vram/scrndraw.h>
 #include	"sdraw.h"
 #include	<vram/palettes.h>
+#if defined(SUPPORT_VIDEOFILTER)
+#include	<vram/videofilter.h>
+#endif
+
+#if defined(SUPPORT_VIDEOFILTER)
+BOOL	bVFEnable;
+BOOL	bVFImport;
+#endif
 
 #if !defined(NP2_SIZE_QVGA) || defined(SIZE_VGATEST)
 

@@ -6,6 +6,9 @@
 #include	"sdraw.h"
 #include	<vram/dispsync.h>
 #include	<vram/palettes.h>
+#if defined(SUPPORT_VIDEOFILTER)
+#include	<vram/videofilter.h>
+#endif
 #ifdef SUPPORT_WAB
 #include	<wab/wab.h>
 #endif
@@ -15,7 +18,9 @@
 	UINT8	np2_tram[SURFACE_SIZE];
 	UINT8	np2_vram[2][SURFACE_SIZE];
 	UINT8	redrawpending = 0;
-
+#if defined(SUPPORT_VIDEOFILTER)
+	BOOL bPreEnable;
+#endif
 
 static void updateallline(UINT32 update) {
 
@@ -145,7 +150,6 @@ const SDRAWFN	*sdrawfn;
 	int			i;
 	int			height;
 	
-
 	if (redraw || redrawpending) {
 		updateallline(0x80808080);
 		redrawpending = 0;
@@ -254,6 +258,21 @@ const SDRAWFN	*sdrawfn;
 			sdraw.src2 = np2_tram;
 			break;
 	}
+#if defined(SUPPORT_VIDEOFILTER)
+	bVFEnable = VideoFilter_GetEnable(hVFMng1) & !np2cfg.vf1_bmponly;
+	bVFImport = FALSE;
+	if(bVFEnable) {
+		if(bit & 3) {
+			VideoFilter_Import98(hVFMng1, (bit & 1) ? np2_vram[0] : np2_vram[1], sdraw.dirty, (gdc.analog & 2) ? TRUE : FALSE);
+			bVFImport = TRUE;
+			VideoFilter_Calc(hVFMng1);
+		}
+	}
+	if(bPreEnable != bVFEnable) {
+		memset(sdraw.dirty, 1, SURFACE_HEIGHT);
+		bPreEnable = bVFEnable;
+	}
+#endif
 	sdraw.dst = surf->ptr;
 	sdraw.width = surf->width;
 	sdraw.xbytes = surf->xalign * surf->width;

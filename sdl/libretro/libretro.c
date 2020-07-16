@@ -39,6 +39,9 @@
 #include <embed/vramhdl.h>
 #include <embed/menubase/menubase.h>
 #include <vram/palettes.h>
+#if defined(SUPPORT_VIDEOFILTER)
+#include <vram/videofilter.h>
+#endif
 #include "sysmenu.h"
 #include <vram/scrndraw.h>
 #include <common/milstr.h>
@@ -426,6 +429,7 @@ static int s2m;
 static int s2m_no;
 static uint8_t s2m_shift;
 static BOOL abKeyStat[0x200];
+static BOOL m_bInputMouse;
 
 static int j2k_pad[12] = { 
    RETRO_DEVICE_ID_JOYPAD_UP,
@@ -585,17 +589,19 @@ void updateInput(){
   // --- move mouse
 
   // mouse
-  int mouse_x_device = input_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_X);
-  int mouse_y_device = input_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_Y);
+  if(m_bInputMouse) {
+		int mouse_x_device = input_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_X);
+		int mouse_y_device = input_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_Y);
 
-  if(menuvram == NULL) {
-    mousemng_sync(mouse_x_device, mouse_y_device);
-  } else {
-    mposx += mouse_x_device; if(mposx < 0) mposx = 0; if(mposx >= w) mposx = w - 1;
-    mposy += mouse_y_device; if(mposy < 0) mposy = 0; if(mposy >= h) mposy = h - 1;
-    if(lastx != mposx || lasty != mposy)
-      menubase_moving(mposx, mposy, 0);
-  }
+		if(menuvram == NULL) {
+		  mousemng_sync(mouse_x_device, mouse_y_device);
+		} else {
+		  mposx += mouse_x_device; if(mposx < 0) mposx = 0; if(mposx >= w) mposx = w - 1;
+		  mposy += mouse_y_device; if(mposy < 0) mposy = 0; if(mposy >= h) mposy = h - 1;
+		  if(lastx != mposx || lasty != mposy)
+		    menubase_moving(mposx, mposy, 0);
+		}
+	}
 
   // Joy2Mouse
   if(m_tJoyMode == LR_NP2KAI_JOYMODE_MOUSE) {
@@ -993,6 +999,35 @@ static void update_variables(void)
          np2cfg.memcheckspeed = 8;
    }
 
+#if defined(SUPPORT_VIDEOFILTER)
+   var.key = "np2kai_vf1";
+   var.value = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "Profile 0") == 0) {
+         np2cfg.vf1_enable = 1;
+         np2cfg.vf1_pno = 0;
+         VideoFilter_SetEnable(hVFMng1, np2cfg.vf1_enable);
+         VideoFilter_SetProfileNo(hVFMng1, 0);
+      } else if (strcmp(var.value, "Profile 1") == 0) {
+         np2cfg.vf1_enable = 1;
+         np2cfg.vf1_pno = 1;
+         VideoFilter_SetEnable(hVFMng1, np2cfg.vf1_enable);
+         VideoFilter_SetProfileNo(hVFMng1, 1);
+      } else if (strcmp(var.value, "Profile 2") == 0) {
+         np2cfg.vf1_enable = 1;
+         np2cfg.vf1_pno = 2;
+         VideoFilter_SetEnable(hVFMng1, np2cfg.vf1_enable);
+         VideoFilter_SetProfileNo(hVFMng1, 2);
+      } else {
+         np2cfg.vf1_enable = 0;
+         VideoFilter_SetEnable(hVFMng1, np2cfg.vf1_enable);
+      }
+      scrndraw_redraw();
+   }
+#endif
+
    var.key = "np2kai_skipline";
    var.value = NULL;
 
@@ -1376,6 +1411,16 @@ static void update_variables(void)
          np2cfg.usecdecc = 0;
    }
 
+  var.key = "np2kai_inputmouse";
+  var.value = NULL;
+  if(environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+    if(strcmp(var.value, "ON") == 0) {
+      m_bInputMouse = true;
+    } else {
+      m_bInputMouse = false;
+    }
+  }
+
   var.key = "np2kai_stick2mouse";
   var.value = NULL;
   if(environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
@@ -1561,6 +1606,14 @@ void retro_init (void)
 	if (log_cb)
 		log_cb(RETRO_LOG_INFO, "Logger interface initialized\n");
 
+   uint64_t statestate = \
+      RETRO_SERIALIZATION_QUIRK_MUST_INITIALIZE | \
+      RETRO_SERIALIZATION_QUIRK_CORE_VARIABLE_SIZE | \
+      RETRO_SERIALIZATION_QUIRK_FRONT_VARIABLE_SIZE | \
+      RETRO_SERIALIZATION_QUIRK_ENDIAN_DEPENDENT;
+
+   environ_cb(RETRO_ENVIRONMENT_SET_SERIALIZATION_QUIRKS, &statestate);
+
 	static struct retro_midi_interface midi_interface;
 	if(environ_cb(RETRO_ENVIRONMENT_GET_MIDI_INTERFACE, &midi_interface))
 		retro_midi_interface = &midi_interface;
@@ -1736,7 +1789,7 @@ size_t retro_serialize_size(void)
    FILEH fh;
 
    path = file_getcd(RETRO_NP2_TEMPSTATE);
-   ret = statsave_save(path);
+   ret = statsave_save_d(path);
    if(ret) {
       size = 0;
    } else {
@@ -1756,7 +1809,7 @@ bool retro_serialize(void *data, size_t size)
    FILEH fh;
 
    path = file_getcd(RETRO_NP2_TEMPSTATE);
-   ret = statsave_save(path);
+   ret = statsave_save_d(path);
    if(ret) {
       file_delete(path);
       return false;
@@ -1781,7 +1834,7 @@ bool retro_unserialize(const void *data, size_t size)
    fh = file_create(path);
    file_write(fh, data, size);
    file_close(fh);
-   statsave_load(path);
+   statsave_load_d(path);
    file_delete(path);
    return true;
 }

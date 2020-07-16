@@ -184,6 +184,21 @@ struct retro_core_option_definition option_defs_us[] = {
       },
       "OFF"
    },
+#if defined(SUPPORT_VIDEOFILTER)
+   {
+      "np2kai_vf1",
+      "Video filter",
+      "Video filter setting. (Setting details set in cfg file)",
+      {
+         { "OFF", NULL },
+         { "Profile 0", NULL },
+         { "Profile 1", NULL },
+         { "Profile 2", NULL },
+         { NULL, NULL},
+      },
+      "OFF"
+   },
+#endif
    {
       "np2kai_gdc",
       "GDC",
@@ -780,6 +795,17 @@ struct retro_core_option_definition option_defs_us[] = {
       "ON"
    },
   {
+    "np2kai_inputmouse",
+    "Use mouse or touchpanel to input mouse",
+    "",
+    {
+      {"OFF", NULL},
+      {"ON", NULL},
+      {NULL, NULL},
+    },
+    "ON"
+  },
+  {
     "np2kai_stick2mouse",
     "S2M(Joypad Analog Stick to Mouse) Mapping",
     "Emulate a mouse on your gamepad's analog stick.",
@@ -1007,6 +1033,21 @@ struct retro_core_option_definition option_defs_ja[] = {
       },
       "OFF"
    },
+#if defined(SUPPORT_VIDEOFILTER)
+   {
+      "np2kai_vf1",
+      "ビデオフィルタ",
+      "ビデオフィルタを設定します。（内容はcfgファイルにて設定。）",
+      {
+         { "OFF", NULL },
+         { "Profile 0", NULL },
+         { "Profile 1", NULL },
+         { "Profile 2", NULL },
+         { NULL, NULL},
+      },
+      "OFF"
+   },
+#endif
    {
       "np2kai_gdc",
       "GDCタイプ",
@@ -1602,6 +1643,17 @@ struct retro_core_option_definition option_defs_ja[] = {
       },
       "ON"
    },
+  {
+    "np2kai_inputmouse",
+    "マウス操作用にマウスまたはタッチパッドを使用",
+    "",
+    {
+      {"OFF", NULL},
+      {"ON", NULL},
+      {NULL, NULL},
+    },
+    "ON"
+  },
   {
     "np2kai_stick2mouse",
     "S2M(ジョイパッド アナログスティック->マウス マッピング",

@@ -9,6 +9,7 @@ project(
 )
 
 cmake_policy(SET CMP0076 NEW)
+list(APPEND CMAKE_MODULE_PATH "${NP2kai_SOURCE_DIR}/cmake")
 
 # Windows
 if(WIN32 OR MSVC_VERSION OR MINGW OR MSYS OR CYGWIN)
@@ -233,7 +234,7 @@ list(APPEND NP2kai_Windows_sources ${NP2kai_temp})
 list(APPEND NP2kai_Windows_sources "windows/resources/1252/np2.rc")
 
 # NP2kai definitions
-list(APPEND NP2kai_common_definitions "BIOS_IO_EMULATION" "OSLANG_UTF8" "SUPPORT_8BPP" "SUPPORT_16BPP" "SUPPORT_24BPP" "SUPPORT_32BPP" "SUPPORT_CL_GD5430" "SUPPORT_CRT15KHZ" "SUPPORT_FAST_MEMORYCHECK" "SUPPORT_FMGEN" "SUPPORT_GPIB" "SUPPORT_HOSTDRV" "SUPPORT_HRTIMER" "SUPPORT_IDEIO" "SUPPORT_KAI_IMAGES" "SUPPORT_LARGE_HDD" "SUPPORT_NORMALDISP" "SUPPORT_PC9861K" "SUPPORT_PX" "SUPPORT_RESUME" "SUPPORT_RS232C_FIFO" "SUPPORT_S98" "SUPPORT_SCSI" "SUPPORT_SMPU98" "SUPPORT_SOFTKBD=0" "SUPPORT_SOUND_SB16" "SUPPORT_STATSAVE=10" "SUPPORT_UTF8" "SUPPORT_V30EXT" "SUPPORT_V30ORIGINAL" "SUPPORT_VPCVHD" "SUPPORT_WAB" "USE_MAME" "VAEG_FIX" "VERMOUTH_LIB")
+list(APPEND NP2kai_common_definitions "BIOS_IO_EMULATION" "OSLANG_UTF8" "SUPPORT_8BPP" "SUPPORT_16BPP" "SUPPORT_24BPP" "SUPPORT_32BPP" "SUPPORT_CL_GD5430" "SUPPORT_CRT15KHZ" "SUPPORT_DEBUGSS" "SUPPORT_FAST_MEMORYCHECK" "SUPPORT_FMGEN" "SUPPORT_GPIB" "SUPPORT_HOSTDRV" "SUPPORT_HRTIMER" "SUPPORT_IDEIO" "SUPPORT_KAI_IMAGES" "SUPPORT_LARGE_HDD" "SUPPORT_NORMALDISP" "SUPPORT_PC9861K" "SUPPORT_PX" "SUPPORT_RESUME" "SUPPORT_RS232C_FIFO" "SUPPORT_S98" "SUPPORT_SCSI" "SUPPORT_SMPU98" "SUPPORT_SOFTKBD=0" "SUPPORT_SOUND_SB16" "SUPPORT_STATSAVE=10" "SUPPORT_UTF8" "SUPPORT_V30EXT" "SUPPORT_V30ORIGINAL" "SUPPORT_VIDEOFILTER" "SUPPORT_VPCVHD" "SUPPORT_WAB" "USE_MAME" "VAEG_FIX" "VERMOUTH_LIB")
 
 list(APPEND NP2kai_extra_definitions "SUPPORT_SMPU98" "SUPPORT_NVL_IMAGES" "SUPPORT_SWSEEKSND" "SUPPORT_SWWABRLYSND")
 
@@ -274,6 +275,13 @@ elseif(BUILD_OPENDINGUX_RG350)
 	include("cmake/CrossOpenDinguxRG350.cmake")
 elseif(BUILD_OPENDINGUX_RS90)
 	include("cmake/CrossOpenDinguxRS90.cmake")
+endif()
+
+if(OPENDINGUX)
+	option(USE_OPENDINGUX_VGA "OpenDingux has VGA display" OFF)
+	if(USE_OPENDINGUX_VGA)
+		list(APPEND OPENDINGUX_VGA_definitions "OPENDINGUX_VGA")
+	endif()
 endif()
 
 if(NOT CMAKE_CROSSCOMPILING)
@@ -480,26 +488,11 @@ if(NOT CMAKE_CROSSCOMPILING)
 	endif()
 
 	# libusb
-	if(NOT NP2kai_Windows)
-		find_path(LIBUSB_INCLUDE_DIR NAMES libusb.h PATH_SUFFIXES "include" "libusb" "libusb-1.0")
-		find_library(LIBUSB_LIBRARY NAMES usb PATH_SUFFIXES "lib" "lib32" "lib64")
-		if(NOT LIBUSB_INCLUDE_DIR STREQUAL "" AND NOT LIBUSB_LIBRARY STREQUAL "")
-			if(LIBUSB_LIBRARY STREQUAL "LIBUSB_LIBRARY-NOTFOUND")
-				set(LIBUSB_LIBRARY "")
-			endif()
-			message("-- Found libusb")
-		else()
-			if(USE_USB)
-				message(FATAL_ERROR "-- Not found libusb")
-			else()
-				message("-- Not found libusb")
-			endif()
-		endif()
-	endif()
 	if(USE_USB)
+		find_package(Libusb1 REQUIRED)
 		list(APPEND lib_usb_definitions "SUPPORT_USB")
-		list(APPEND lib_usb_include_dirs ${LIBUSB_INCLUDE_DIR})
-		list(APPEND lib_usb_libraries ${LIBUSB_LIBRARY})
+		list(APPEND lib_usb_include_dirs ${LIBUSB1_INCLUDE_DIRS})
+		list(APPEND lib_usb_libraries ${LIBUSB1_LIBRARIES})
 	endif()
 
 	# X11
@@ -512,13 +505,34 @@ if(NOT CMAKE_CROSSCOMPILING)
 		endif()
 	endif()
 
+	# Freetype
+	find_package(Freetype)
+	if(NOT Freetype_FOUND)
+		if(USE_X)
+			message(FATAL_ERROR "-- Not found Freetype")
+		else()
+			message("-- Not found Freetype")
+		endif()
+	endif()
+
+	# Fontconfig
+	find_package(Fontconfig)
+	if(NOT Fontconfig_FOUND)
+		if(USE_X)
+			message(FATAL_ERROR "-- Not found Fontconfig")
+		else()
+			message("-- Not found Fontconfig")
+		endif()
+	endif()
+
 	# glib-2.0
 	if(USE_X)
 		find_package(PkgConfig REQUIRED)
 		pkg_check_modules(GLIB REQUIRED glib-2.0)
 		find_path(lib_glib_include_dirs NAMES glib.h HINTS ${GLIB_INCLUDEDIR} ${GLIB_INCLUDE_DIRS})
 		find_path(lib_glibconfig_include_dirs NAMES glibconfig.h HINTS ${GLIB_INCLUDEDIR} ${GLIB_INCLUDE_DIRS})
-		find_library(lib_glib_libraries NAMES glib glib-2.0 PATH_SUFFIXES glib-2.0)
+		# temporaly glib-2.0 is static link
+		find_library(lib_glib_libraries NAMES glib-2.0)
 		if(lib_glib_include_dirs AND lib_glibconfig_include_dirs AND lib_glib_libraries)
 			message("-- Found glib2.0")
 		else()
@@ -535,6 +549,8 @@ if(NOT CMAKE_CROSSCOMPILING)
 			message("-- Not found GTK2")
 		endif()
 	endif()
+	# temporaly glib-2.0 is static link
+	list(FILTER GTK2_LIBRARIES EXCLUDE REGEX ".*glib-2.0.so$")
 
 	# OpenSSL
 	if(NOT MSVC_VERSION)
@@ -606,6 +622,9 @@ if(CMAKE_CROSSCOMPILING)
 
 	# OpenDigux
 	elseif(BUILD_OPENDINGUX_GCW0)
+		if((USE_SDL_VERSION EQUAL 1) AND USE_SDL_TTF)
+			message(FATAL_ERROR "-- OpenDingux GCW0 NP2kai cannot be with SDL and SDL_ttf (use -D USE_SDL2=OFF -D USE_SDL_TTF=OFF)")
+		endif()
 		find_path(gcw0toolchain "bin" "/opt/gcw0-toolchain/usr")
 		if(gcw0toolchain)
 			message("-- Found OpenDingux GCW0 toolchain")
@@ -614,17 +633,16 @@ if(CMAKE_CROSSCOMPILING)
 		endif()
 
 	elseif(BUILD_OPENDINGUX_RG350)
-		find_path(rg350toolchain "bin" "/opt/rg350-toolchain/usr")
-		set(rg350toolchain true)
-		if(rg350toolchain)
-			message("-- Found OpenDingux RG350 toolchain")
-		else()
-			message(FATAL_ERROR "-- Not found OpenDingux RG350 toolchain")
-		endif()
+#		find_path(rg350toolchain "bin" "/opt/rg350-toolchain/usr")
+#		if(rg350toolchain)
+#			message("-- Found OpenDingux RG350 toolchain")
+#		else()
+#			message(FATAL_ERROR "-- Not found OpenDingux RG350 toolchain")
+#		endif()
 
 	elseif(BUILD_OPENDINGUX_RS90)
 		if((USE_SDL_VERSION EQUAL 2) OR USE_SDL_TTF)
-			message(FATAL_ERROR "-- OpenDingux RS90 NP2kai cannot be with SDL2 and SDL_ttf (-D USE_SDL2=OFF -D USE_SDL_TTF=OFF)")
+			message(FATAL_ERROR "-- OpenDingux RS90 NP2kai cannot be with SDL2 and SDL_ttf (use -D USE_SDL2=OFF -D USE_SDL_TTF=OFF)")
 		endif()
 
 		find_path(rs90toolchain "bin" "/opt/rs90-toolchain/usr")
@@ -680,7 +698,7 @@ if(CMAKE_CROSSCOMPILING)
 		target_sources(NP2kai_Emscripten_SDL1_base INTERFACE ${NP2kai_SDL_sources} "sdl/em/main.c" "sdl/em/SDL_mixer.c")
 
 		add_library(NP2kai_Emscripten_SDL2_base INTERFACE)
-		target_compile_definitions(NP2kai_Emscripten_SDL2_base INTERFACE ${NP2kai_SDL_definitions} "OSLINEBREAK_LF" "SUPPORT_SDL_AUDIO" "SUPPORT_SDL_MIXER" "SUPPORT_SDL_TTF" "SUPPORT_NP2_TICKCOUNT")
+		target_compile_definitions(NP2kai_Emscripten_SDL2_base INTERFACE ${NP2kai_SDL_definitions} "OSLINEBREAK_LF" "SUPPORT_SDL_AUDIO" ${lib_SDL_mixer_definitions} ${lib_SDL_ttf_definitions} "SUPPORT_NP2_TICKCOUNT")
 		target_include_directories(NP2kai_Emscripten_SDL2_base INTERFACE ${NP2kai_Emscripten_include_dirs})
 		target_compile_options(NP2kai_Emscripten_SDL2_base INTERFACE "SHELL:-s USE_SDL=2" "SHELL:-s USE_SDL_MIXER=2" "SHELL:-s USE_SDL_TTF=2")
 		target_link_options(NP2kai_Emscripten_SDL2_base INTERFACE "SHELL:-s INITIAL_MEMORY=${NP2kai_Emscripten_MinMemorySize}" "SHELL:-s MAXIMUM_MEMORY=${NP2kai_Emscripten_MaxMemorySize}" "SHELL:-s USE_SDL=2" "SHELL:-s USE_SDL_MIXER=2" "SHELL:-s USE_SDL_TTF=2" "SHELL:-s ASSERTIONS=1")
@@ -690,52 +708,52 @@ if(CMAKE_CROSSCOMPILING)
 
 	if(BUILD_OPENDINGUX_GCW0)
 		add_library(NP2kai_gcw0_SDL1_base INTERFACE)
-		target_compile_definitions(NP2kai_gcw0_SDL1_base INTERFACE ${NP2kai_SDL_definitions} "__OPENDINGUX__" "OSLINEBREAK_LF" "SUPPORT_SDL_AUDIO" "SUPPORT_SDL_MIXER" "SUPPORT_SDL_TTF" "SUPPORT_NP2_TICKCOUNT" "SUPPORT_NP2_THREAD" ${NP2kai_TickCount_definitions} ${NP2kai_Network_definitions})
+		target_compile_definitions(NP2kai_gcw0_SDL1_base INTERFACE ${NP2kai_SDL_definitions} "__OPENDINGUX__" ${OPENDINGUX_VGA_definitions} "OSLINEBREAK_LF" "SUPPORT_SDL_AUDIO" ${lib_SDL_mixer_definitions} ${lib_SDL_ttf_definitions} "SUPPORT_NP2_TICKCOUNT" "SUPPORT_NP2_THREAD" ${NP2kai_TickCount_definitions} ${NP2kai_Network_definitions})
 		target_sources(NP2kai_gcw0_SDL1_base INTERFACE ${NP2kai_SDL_sources} ${NP2kai_OpenDingux_sources} "np2_thread.c" ${NP2kai_TickCount_sources} ${NP2kai_Network_sources})
 		target_link_directories(NP2kai_gcw0_SDL1_base INTERFACE "/opt/gcw0-toolchain/usr/mipsel-gcw0-linux-uclibc/sysroot/lib")
 		target_include_directories(NP2kai_gcw0_SDL1_base INTERFACE ${NP2kai_OpenDingux_include_dirs} "/opt/gcw0-toolchain/mipsel-gcw0-linux-uclibc/sysroot/usr/include" "/opt/gcw0-toolchain/usr/mipsel-gcw0-linux-uclibc/sysroot/usr/include/SDL")
-		target_link_libraries(NP2kai_gcw0_SDL1_base INTERFACE m ssl crypto pthread SDL SDL_mixer SDL_ttf)
+		target_link_libraries(NP2kai_gcw0_SDL1_base INTERFACE m ssl crypto pthread SDL ${lib_SDL_mixer_depend_libraries} ${lib_SDL_ttf_definitions})
 
 		add_library(NP2kai_gcw0_SDL2_base INTERFACE)
-		target_compile_definitions(NP2kai_gcw0_SDL2_base INTERFACE ${NP2kai_SDL_definitions} "__OPENDINGUX__" "OSLINEBREAK_LF" "SUPPORT_SDL_AUDIO" "SUPPORT_SDL_MIXER" "SUPPORT_SDL_TTF" "SUPPORT_NP2_TICKCOUNT" "SUPPORT_NP2_THREAD" ${NP2kai_TickCount_definitions} ${NP2kai_Network_definitions})
+		target_compile_definitions(NP2kai_gcw0_SDL2_base INTERFACE ${NP2kai_SDL_definitions} "__OPENDINGUX__" ${OPENDINGUX_VGA_definitions} "OSLINEBREAK_LF" "SUPPORT_SDL_AUDIO" ${lib_SDL_mixer_definitions} ${lib_SDL_ttf_definitions} "SUPPORT_NP2_TICKCOUNT" "SUPPORT_NP2_THREAD" ${NP2kai_TickCount_definitions} ${NP2kai_Network_definitions})
 		target_sources(NP2kai_gcw0_SDL2_base INTERFACE ${NP2kai_SDL_sources} ${NP2kai_OpenDingux_sources} "np2_thread.c" ${NP2kai_TickCount_sources} ${NP2kai_Network_sources})
 		target_link_directories(NP2kai_gcw0_SDL2_base INTERFACE "/opt/gcw0-toolchain/usr/mipsel-gcw0-linux-uclibc/sysroot/lib")
 		target_include_directories(NP2kai_gcw0_SDL2_base INTERFACE ${NP2kai_OpenDingux_include_dirs} "/opt/gcw0-toolchain/mipsel-gcw0-linux-uclibc/sysroot/usr/include" "/opt/gcw0-toolchain/usr/mipsel-gcw0-linux-uclibc/sysroot/usr/include/SDL2")
-		target_link_libraries(NP2kai_gcw0_SDL2_base INTERFACE m ssl crypto pthread SDL2 SDL2_mixer SDL2_ttf)
+		target_link_libraries(NP2kai_gcw0_SDL2_base INTERFACE m ssl crypto pthread SDL2 ${lib_SDL_mixer_depend_libraries} ${lib_SDL_ttf_definitions})
 	endif()
 
 	if(BUILD_OPENDINGUX_RG350)
 		add_library(NP2kai_rg350_SDL1_base INTERFACE)
-		target_compile_definitions(NP2kai_rg350_SDL1_base INTERFACE ${NP2kai_SDL_definitions} "__OPENDINGUX__" "OSLINEBREAK_LF" "SUPPORT_SDL_AUDIO" "SUPPORT_SDL_MIXER" "SUPPORT_SDL_TTF" "SUPPORT_NP2_TICKCOUNT" "SUPPORT_NP2_THREAD" ${NP2kai_TickCount_definitions} ${NP2kai_Network_definitions})
+		target_compile_definitions(NP2kai_rg350_SDL1_base INTERFACE ${NP2kai_SDL_definitions} "__OPENDINGUX__" ${OPENDINGUX_VGA_definitions} "OSLINEBREAK_LF" "SUPPORT_SDL_AUDIO" ${lib_SDL_mixer_definitions} ${lib_SDL_ttf_definitions} "SUPPORT_NP2_TICKCOUNT" "SUPPORT_NP2_THREAD" ${NP2kai_TickCount_definitions} ${NP2kai_Network_definitions})
 		target_sources(NP2kai_rg350_SDL1_base INTERFACE ${NP2kai_SDL_sources} ${NP2kai_OpenDingux_sources} "np2_thread.c" ${NP2kai_TickCount_sources} ${NP2kai_Network_sources})
 		target_link_directories(NP2kai_rg350_SDL1_base INTERFACE "/opt/rg350-toolchain/usr/mipsel-gcw0-linux-uclibc/sysroot/usr/lib")
 		target_include_directories(NP2kai_rg350_SDL1_base INTERFACE ${NP2kai_OpenDingux_include_dirs} "/opt/rg350-toolchain/usr/mipsel-rg350-linux-uclibc/sysroot/usr/include" "/opt/rg350-toolchain/usr/mipsel-rg350-linux-uclibc/sysroot/usr/include/SDL")
-		target_link_libraries(NP2kai_rg350_SDL1_base INTERFACE m ssl crypto pthread SDL SDL_mixer SDL_ttf)
+		target_link_libraries(NP2kai_rg350_SDL1_base INTERFACE m ssl crypto pthread SDL ${lib_SDL_mixer_depend_libraries} ${lib_SDL_ttf_definitions})
 
 		add_library(NP2kai_rg350_SDL2_base INTERFACE)
-		target_compile_definitions(NP2kai_rg350_SDL2_base INTERFACE ${NP2kai_SDL_definitions} "__OPENDINGUX__" "OSLINEBREAK_LF" "SUPPORT_SDL_AUDIO" "SUPPORT_SDL_MIXER" "SUPPORT_SDL_TTF" "SUPPORT_NP2_TICKCOUNT" "SUPPORT_NP2_THREAD" ${NP2kai_TickCount_definitions} ${NP2kai_Network_definitions})
+		target_compile_definitions(NP2kai_rg350_SDL2_base INTERFACE ${NP2kai_SDL_definitions} "__OPENDINGUX__" ${OPENDINGUX_VGA_definitions} "OSLINEBREAK_LF" "SUPPORT_SDL_AUDIO" ${lib_SDL_mixer_definitions} ${lib_SDL_ttf_definitions} "SUPPORT_NP2_TICKCOUNT" "SUPPORT_NP2_THREAD" ${NP2kai_TickCount_definitions} ${NP2kai_Network_definitions})
 		target_sources(NP2kai_rg350_SDL2_base INTERFACE ${NP2kai_SDL_sources} ${NP2kai_OpenDingux_sources} "np2_thread.c" ${NP2kai_TickCount_sources} ${NP2kai_Network_sources})
 		target_link_directories(NP2kai_rg350_SDL2_base INTERFACE "/opt/rg350-toolchain/usr/mipsel-gcw0-linux-uclibc/sysroot/usr/lib")
 		target_include_directories(NP2kai_rg350_SDL2_base INTERFACE ${NP2kai_OpenDingux_include_dirs} "/opt/rg350-toolchain/usr/mipsel-rg350-linux-uclibc/sysroot/usr/include" "/opt/rg350-toolchain/usr/mipsel-rg350-linux-uclibc/sysroot/usr/include/SDL2")
-		target_link_libraries(NP2kai_rg350_SDL2_base INTERFACE m ssl crypto pthread SDL2 SDL2_mixer SDL2_ttf)
+		target_link_libraries(NP2kai_rg350_SDL2_base INTERFACE m ssl crypto pthread SDL2 ${lib_SDL_mixer_depend_libraries} ${lib_SDL_ttf_definitions})
 	endif()
 
 	if(BUILD_OPENDINGUX_RS90)
 		add_library(NP2kai_rs90_SDL1_base INTERFACE)
-#		target_compile_definitions(NP2kai_rs90_SDL1_base INTERFACE ${NP2kai_SDL_definitions} "__OPENDINGUX__" "OSLINEBREAK_LF" "SUPPORT_SDL_AUDIO" "SUPPORT_SDL_MIXER" "SUPPORT_SDL_TTF" "SUPPORT_NP2_TICKCOUNT" "SUPPORT_NP2_THREAD" ${NP2kai_TickCount_definitions} ${NP2kai_Network_definitions})
-		target_compile_definitions(NP2kai_rs90_SDL1_base INTERFACE ${NP2kai_SDL_definitions} "__OPENDINGUX__" "OSLINEBREAK_LF" "SUPPORT_SDL_AUDIO" "SUPPORT_SDL_MIXER" "SUPPORT_NP2_TICKCOUNT" "SUPPORT_NP2_THREAD" ${NP2kai_TickCount_definitions} ${NP2kai_Network_definitions})
+#		target_compile_definitions(NP2kai_rs90_SDL1_base INTERFACE ${NP2kai_SDL_definitions} "__OPENDINGUX__" ${OPENDINGUX_VGA_definitions} "OSLINEBREAK_LF" "SUPPORT_SDL_AUDIO" ${lib_SDL_mixer_definitions} ${lib_SDL_ttf_definitions} "SUPPORT_NP2_TICKCOUNT" "SUPPORT_NP2_THREAD" ${NP2kai_TickCount_definitions} ${NP2kai_Network_definitions})
+		target_compile_definitions(NP2kai_rs90_SDL1_base INTERFACE ${NP2kai_SDL_definitions} "__OPENDINGUX__" ${OPENDINGUX_VGA_definitions} "OSLINEBREAK_LF" "SUPPORT_SDL_AUDIO" ${lib_SDL_mixer_definitions} "SUPPORT_NP2_TICKCOUNT" "SUPPORT_NP2_THREAD" ${NP2kai_TickCount_definitions} ${NP2kai_Network_definitions})
 		target_include_directories(NP2kai_rs90_SDL1_base INTERFACE ${NP2kai_OpenDingux_include_dirs} "/opt/rs90-toolchain/mipsel-rs90-linux-musl/sysroot/usr/include" "/opt/rs90-toolchain/mipsel-rs90-linux-musl/sysroot/usr/include/SDL")
 		target_sources(NP2kai_rs90_SDL1_base INTERFACE ${NP2kai_SDL_sources} ${NP2kai_OpenDingux_sources} "np2_thread.c" ${NP2kai_TickCount_sources} ${NP2kai_Network_sources})
 		target_link_directories(NP2kai_rs90_SDL1_base INTERFACE "/opt/rs90-toolchain/mipsel-rs90-linux-musl/sysroot/lib")
-		target_link_libraries(NP2kai_rs90_SDL1_base INTERFACE m ssl crypto pthread SDL SDL_mixer)
+		target_link_libraries(NP2kai_rs90_SDL1_base INTERFACE m ssl crypto pthread SDL ${lib_SDL_mixer_depend_libraries} ${lib_SDL_ttf_definitions})
 
 		add_library(NP2kai_rs90_base INTERFACE)
-#		target_compile_definitions(NP2kai_rs90_base INTERFACE ${NP2kai_SDL_definitions} "__OPENDINGUX__" "OSLINEBREAK_LF" "SUPPORT_SDL_AUDIO" "SUPPORT_SDL_MIXER" "SUPPORT_SDL_TTF" "SUPPORT_NP2_TICKCOUNT" "SUPPORT_NP2_THREAD" ${NP2kai_TickCount_definitions} ${NP2kai_Network_definitions})
-		target_compile_definitions(NP2kai_rs90_base INTERFACE ${NP2kai_SDL_definitions} "__OPENDINGUX__" "OSLINEBREAK_LF" "SUPPORT_SDL_AUDIO" "SUPPORT_SDL_MIXER" "SUPPORT_NP2_TICKCOUNT" "SUPPORT_NP2_THREAD" ${NP2kai_TickCount_definitions} ${NP2kai_Network_definitions})
+#		target_compile_definitions(NP2kai_rs90_base INTERFACE ${NP2kai_SDL_definitions} "__OPENDINGUX__" ${OPENDINGUX_VGA_definitions} "OSLINEBREAK_LF" "SUPPORT_SDL_AUDIO" ${lib_SDL_mixer_definitions} ${lib_SDL_ttf_definitions} "SUPPORT_NP2_TICKCOUNT" "SUPPORT_NP2_THREAD" ${NP2kai_TickCount_definitions} ${NP2kai_Network_definitions})
+		target_compile_definitions(NP2kai_rs90_base INTERFACE ${NP2kai_SDL_definitions} "__OPENDINGUX__" ${OPENDINGUX_VGA_definitions} "OSLINEBREAK_LF" "SUPPORT_SDL_AUDIO" ${lib_SDL_mixer_definitions} "SUPPORT_NP2_TICKCOUNT" "SUPPORT_NP2_THREAD" ${NP2kai_TickCount_definitions} ${NP2kai_Network_definitions})
 		target_include_directories(NP2kai_rs90_base INTERFACE ${NP2kai_OpenDingux_include_dirs} "/opt/rs90-toolchain/mipsel-rs90-linux-musl/sysroot/usr/include" "/opt/rs90-toolchain/mipsel-rs90-linux-musl/sysroot/usr/include/SDL")
 		target_sources(NP2kai_rs90_base INTERFACE ${NP2kai_SDL_sources} ${NP2kai_OpenDingux_sources} "np2_thread.c" ${NP2kai_TickCount_sources} ${NP2kai_Network_sources})
 		target_link_directories(NP2kai_rs90_base INTERFACE "/opt/rs90-toolchain/mipsel-rs90-linux-musl/sysroot/lib")
-		target_link_libraries(NP2kai_rs90_base INTERFACE m ssl crypto pthread SDL2 SDL2_mixer)
+		target_link_libraries(NP2kai_rs90_base INTERFACE m ssl crypto pthread SDL2 ${lib_SDL_mixer_depend_libraries} ${lib_SDL_ttf_definitions})
 	endif()
 
 else()
@@ -757,22 +775,22 @@ else()
 	add_library(NP2kai_X_SDL1_base INTERFACE)
 	target_sources(NP2kai_X_SDL1_base INTERFACE ${NP2kai_X_sources} ${NP2kai_Thread_sources} ${NP2kai_TickCount_sources} ${NP2kai_Network_sources})
 	target_compile_definitions(NP2kai_X_SDL1_base INTERFACE ${NP2kai_X_definitions} ${lib_SDL_definitions} ${lib_SDL_mixer_definitions} ${lib_SDL_ttf_definitions} ${NP2kai_extra_definitions} ${NP2kai_LinkBreak_definitions} ${NP2kai_TickCount_definitions} ${NP2kai_Network_definitions} ${GTK2_DEFINITIONS} ${SDL_DEFINE} ${SDL_MIXER_DEFINE} ${SDL_TTF_DEFINE} ${lib_OpenSSL_definitions} ${lib_usb_definitions} "SYSRESPATH=\"resources\"")
-	target_include_directories(NP2kai_X_SDL1_base INTERFACE ${NP2kai_X_include_dirs} ${lib_glib_include_dirs} ${lib_glibconfig_include_dirs} ${GTK2_INCLUDE_DIRS} ${X11_INCLUDE_DIRS} ${SDL_INCLUDE_DIR} ${SDL_MIXER_INCLUDE_DIR} ${SDL_TTF_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR} ${lib_usb_include_dirs} ${lib_vst3sdk_include_dirs})
-	target_link_libraries(NP2kai_X_SDL1_base INTERFACE ${lib_math_libraries} ssl crypto ${lib_glib_libraries} ${GTK2_LIBRARIES} ${X11_LIBRARIES} ${lib_vst3sdk_libraries} ${lib_Threads_libraries} ${SDL_LIBRARY} ${SDL_MIXER_LIBRARY} ${SDL_TTF_LIBRARY} ${lib_SDL_depend_libraries} ${lib_SDL_mixer_depend_libraries} ${lib_SDL_ttf_depend_libraries} ${OPENSSL_LIBRARIES} ${lib_usb_libraries} ${lib_dl_libraries})
+	target_include_directories(NP2kai_X_SDL1_base INTERFACE ${NP2kai_X_include_dirs} ${lib_glib_include_dirs} ${lib_glibconfig_include_dirs} ${GTK2_INCLUDE_DIRS} ${X11_INCLUDE_DIRS} ${Freetype_INCLUDE_DIRS} ${Fontconfig_INCLUDE_DIRS} ${SDL_INCLUDE_DIR} ${SDL_MIXER_INCLUDE_DIR} ${SDL_TTF_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR} ${lib_usb_include_dirs} ${lib_vst3sdk_include_dirs})
+	target_link_libraries(NP2kai_X_SDL1_base INTERFACE ${lib_math_libraries} ssl crypto glib-2.0 ${GTK2_LIBRARIES} ${X11_LIBRARIES} ${Freetype_LIBRARIES} ${Fontconfig_LIBRARIES} ${lib_vst3sdk_libraries} ${lib_Threads_libraries} ${SDL_LIBRARY} ${SDL_MIXER_LIBRARY} ${SDL_TTF_LIBRARY} ${lib_SDL_depend_libraries} ${lib_SDL_mixer_depend_libraries} ${lib_SDL_ttf_depend_libraries} ${OPENSSL_LIBRARIES} ${lib_usb_libraries} ${lib_dl_libraries})
 
 	add_library(NP2kai_X_SDL2_base INTERFACE)
 	target_sources(NP2kai_X_SDL2_base INTERFACE ${NP2kai_X_sources} ${NP2kai_Thread_sources} ${NP2kai_TickCount_sources} ${NP2kai_Network_sources})
 	target_compile_definitions(NP2kai_X_SDL2_base INTERFACE ${NP2kai_X_definitions} ${lib_SDL_definitions} ${lib_SDL_mixer_definitions} ${lib_SDL_ttf_definitions} ${NP2kai_extra_definitions} ${NP2kai_LinkBreak_definitions} ${NP2kai_TickCount_definitions} ${NP2kai_Network_definitions} ${GTK2_DEFINITIONS} ${SDL2_DEFINE} ${SDL2_MIXER_DEFINE} ${SDL2_TTF_DEFINE} ${lib_OpenSSL_definitions} ${lib_usb_definitions} "SYSRESPATH=\"resources\"")
-	#target_include_directories(NP2kai_X_SDL2_base INTERFACE ${NP2kai_X_include_dirs} ${lib_glib_include_dirs} ${lib_glibconfig_include_dirs} ${GTK2_INCLUDE_DIRS} ${X11_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIR} ${lib_usb_include_dirs} ${lib_vst3sdk_include_dirs})
-	target_include_directories(NP2kai_X_SDL2_base INTERFACE ${NP2kai_X_include_dirs} ${lib_glib_include_dirs} ${lib_glibconfig_include_dirs} ${GTK2_INCLUDE_DIRS} ${X11_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIR} ${SDL2_INCLUDE_DIR} ${SDL2_MIXER_INCLUDE_DIR} ${SDL2_TTF_INCLUDE_DIR} ${lib_usb_include_dirs} ${lib_vst3sdk_include_dirs})
-	#target_link_libraries(NP2kai_X_SDL2_base INTERFACE ${lib_math_libraries} ${lib_glib_libraries} ${GTK2_LIBRARIES} ${X11_LIBRARIES} ${lib_vst3sdk_libraries} ${lib_Threads_libraries} SDL2::Main SDL2::Mixer SDL2::TTF ${lib_SDL_depend_libraries} ${lib_SDL_mixer_depend_libraries} ${lib_SDL_ttf_depend_libraries} ${OPENSSL_LIBRARIES} ${lib_usb_libraries} ${lib_dl_libraries})
-	target_link_libraries(NP2kai_X_SDL2_base INTERFACE ${lib_math_libraries} ssl crypto ${lib_glib_libraries} ${GTK2_LIBRARIES} ${X11_LIBRARIES} ${lib_vst3sdk_libraries} ${lib_Threads_libraries} ${SDL2_LIBRARY} ${SDL2_MIXER_LIBRARY} ${SDL2_TTF_LIBRARY} ${lib_SDL_depend_libraries} ${lib_SDL_mixer_depend_libraries} ${lib_SDL_ttf_depend_libraries} ${OPENSSL_LIBRARIES} ${lib_usb_libraries} ${lib_dl_libraries})
+	#target_include_directories(NP2kai_X_SDL2_base INTERFACE ${NP2kai_X_include_dirs} ${lib_glib_include_dirs} ${lib_glibconfig_include_dirs} ${GTK2_INCLUDE_DIRS} ${X11_INCLUDE_DIRS} ${Fontconfig_INCLUDE_DIRS} ${Freetype_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIR} ${lib_usb_include_dirs} ${lib_vst3sdk_include_dirs})
+	target_include_directories(NP2kai_X_SDL2_base INTERFACE ${NP2kai_X_include_dirs} ${lib_glib_include_dirs} ${lib_glibconfig_include_dirs} ${GTK2_INCLUDE_DIRS} ${X11_INCLUDE_DIRS} ${Fontconfig_INCLUDE_DIRS} ${Freetype_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIR} ${SDL2_INCLUDE_DIR} ${SDL2_MIXER_INCLUDE_DIR} ${SDL2_TTF_INCLUDE_DIR} ${lib_usb_include_dirs} ${lib_vst3sdk_include_dirs})
+	#target_link_libraries(NP2kai_X_SDL2_base INTERFACE ${lib_math_libraries} glib-2.0 ${GTK2_LIBRARIES} ${X11_LIBRARIES} ${Fontconfig_LIBRARIES} ${Freetype_LIBRARIES} ${lib_vst3sdk_libraries} ${lib_Threads_libraries} SDL2::Main SDL2::Mixer SDL2::TTF ${lib_SDL_depend_libraries} ${lib_SDL_mixer_depend_libraries} ${lib_SDL_ttf_depend_libraries} ${OPENSSL_LIBRARIES} ${lib_usb_libraries} ${lib_dl_libraries})
+	target_link_libraries(NP2kai_X_SDL2_base INTERFACE ${lib_math_libraries} ssl crypto glib-2.0 ${GTK2_LIBRARIES} ${X11_LIBRARIES} ${Fontconfig_LIBRARIES} ${Freetype_LIBRARIES} ${lib_vst3sdk_libraries} ${lib_Threads_libraries} ${SDL2_LIBRARY} ${SDL2_MIXER_LIBRARY} ${SDL2_TTF_LIBRARY} ${lib_SDL_depend_libraries} ${lib_SDL_mixer_depend_libraries} ${lib_SDL_ttf_depend_libraries} ${OPENSSL_LIBRARIES} ${lib_usb_libraries} ${lib_dl_libraries})
 
 	if(MSVC_VERSION)
-		add_library(NP2kai_windows_932 MODULE "windows/resources/932/np2jp.rc")
-		add_library(NP2kai_windows_936 MODULE "windows/resources/936/np2.rc")
-		add_library(NP2kai_windows_950 MODULE "windows/resources/950/np2.rc")
-		add_library(NP2kai_windows_1252 MODULE "windows/resources/1252/np2.rc")
+		add_subdirectory(windows/resources/932)
+		add_subdirectory(windows/resources/936)
+		add_subdirectory(windows/resources/950)
+		add_subdirectory(windows/resources/1252)
 
 		add_library(NP2kai_Windows_base INTERFACE)
 		if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -839,7 +857,7 @@ if(CMAKE_CROSSCOMPILING)
 			COMMAND cp -r ${NP2kai_SOURCE_DIR}/sdl/opendingux/opk ${NP2kai_BINARY_DIR}/np2kai_gcw0_sdl1_opk
 			COMMAND mv np2kai_gcw0_sdl1.opk ${NP2kai_BINARY_DIR}/np2kai_gcw0_sdl1_opk/
 			COMMAND rm ${NP2kai_BINARY_DIR}/np2kai_gcw0_sdl1_opk/default_opendingux_np21kai_desktop
-			COMMAND sed -i -e 's/Name=NP2kai/Name=NP2kai(SDL1)/g' ${NP2kai_BINARY_DIR}/np2kai_gcw0_sdl1_opk/default_opendingux_np2kai_desktop
+			COMMAND sed -i -e 's/Name=NP2kai/Name=NP2kai\(SDL1\)/g' ${NP2kai_BINARY_DIR}/np2kai_gcw0_sdl1_opk/default_opendingux_np2kai_desktop
 			COMMAND sed -i -e 's/Exec=np2kai/Exec=np2kai_gcw0_sdl1/g' ${NP2kai_BINARY_DIR}/np2kai_gcw0_sdl1_opk/default_opendingux_np2kai_desktop
 			COMMAND mv ${NP2kai_BINARY_DIR}/np2kai_gcw0_sdl1_opk/default_opendingux_np2kai_desktop ${NP2kai_BINARY_DIR}/np2kai_gcw0_sdl1_opk/default_opendingux_np2kai_gcw0_sdl1.desktop
 			COMMAND mksquashfs ${NP2kai_BINARY_DIR}/np2kai_gcw0_sdl1_opk ${NP2kai_BINARY_DIR}/np2kai_gcw0_sdl1.opk -all-root -noappend -no-exports
@@ -855,7 +873,7 @@ if(CMAKE_CROSSCOMPILING)
 			COMMAND cp -r ${NP2kai_SOURCE_DIR}/sdl/opendingux/opk ${NP2kai_BINARY_DIR}/np21kai_gcw0_sdl1_opk
 			COMMAND mv np21kai_gcw0_sdl1.opk ${NP2kai_BINARY_DIR}/np21kai_gcw0_sdl1_opk/
 			COMMAND rm ${NP2kai_BINARY_DIR}/np21kai_gcw0_sdl1_opk/default_opendingux_np2kai_desktop
-			COMMAND sed -i -e 's/Name=NP21kai/Name=NP21kai(SDL1)/g' ${NP2kai_BINARY_DIR}/np21kai_gcw0_sdl1_opk/default_opendingux_np21kai_desktop
+			COMMAND sed -i -e 's/Name=NP21kai/Name=NP21kai\(SDL1\)/g' ${NP2kai_BINARY_DIR}/np21kai_gcw0_sdl1_opk/default_opendingux_np21kai_desktop
 			COMMAND sed -i -e 's/Exec=np21kai/Exec=np21kai_gcw0_sdl1/g' ${NP2kai_BINARY_DIR}/np21kai_gcw0_sdl1_opk/default_opendingux_np21kai_desktop
 			COMMAND mv ${NP2kai_BINARY_DIR}/np21kai_gcw0_sdl1_opk/default_opendingux_np21kai_desktop ${NP2kai_BINARY_DIR}/np21kai_gcw0_sdl1_opk/default_opendingux_np21kai_gcw0_sdl1.desktop
 			COMMAND mksquashfs ${NP2kai_BINARY_DIR}/np21kai_gcw0_sdl1_opk ${NP2kai_BINARY_DIR}/np21kai_gcw0_sdl1.opk -all-root -noappend -no-exports
@@ -914,7 +932,7 @@ if(CMAKE_CROSSCOMPILING)
 			COMMAND cp -r ${NP2kai_SOURCE_DIR}/sdl/opendingux/opk ${NP2kai_BINARY_DIR}/np2kai_rg350_sdl1_opk
 			COMMAND mv np2kai_rg350_sdl1.opk ${NP2kai_BINARY_DIR}/np2kai_rg350_sdl1_opk/
 			COMMAND rm ${NP2kai_BINARY_DIR}/np2kai_rg350_sdl1_opk/default_opendingux_np21kai_desktop
-			COMMAND sed -i -e 's/Name=NP2kai/Name=NP2kai(SDL1)/g' ${NP2kai_BINARY_DIR}/np2kai_rg350_sdl1_opk/default_opendingux_np2kai_desktop
+			COMMAND sed -i -e 's/Name=NP2kai/Name=NP2kai\(SDL1\)/g' ${NP2kai_BINARY_DIR}/np2kai_rg350_sdl1_opk/default_opendingux_np2kai_desktop
 			COMMAND sed -i -e 's/Exec=np2kai/Exec=np2kai_rg350_sdl1/g' ${NP2kai_BINARY_DIR}/np2kai_rg350_sdl1_opk/default_opendingux_np2kai_desktop
 			COMMAND mv ${NP2kai_BINARY_DIR}/np2kai_rg350_sdl1_opk/default_opendingux_np2kai_desktop ${NP2kai_BINARY_DIR}/np2kai_rg350_sdl1_opk/default_opendingux_np2kai_rg350_sdl1.desktop
 			COMMAND mksquashfs ${NP2kai_BINARY_DIR}/np2kai_rg350_sdl1_opk ${NP2kai_BINARY_DIR}/np2kai_rg350_sdl1.opk -all-root -noappend -no-exports
@@ -930,7 +948,7 @@ if(CMAKE_CROSSCOMPILING)
 			COMMAND cp -r ${NP2kai_SOURCE_DIR}/sdl/opendingux/opk ${NP2kai_BINARY_DIR}/np21kai_rg350_sdl1_opk
 			COMMAND mv np21kai_rg350_sdl1.opk ${NP2kai_BINARY_DIR}/np21kai_rg350_sdl1_opk/
 			COMMAND rm ${NP2kai_BINARY_DIR}/np21kai_rg350_sdl1_opk/default_opendingux_np2kai_desktop
-			COMMAND sed -i -e 's/Name=NP21kai/Name=NP21kai(SDL1)/g' ${NP2kai_BINARY_DIR}/np21kai_rg350_sdl1_opk/default_opendingux_np21kai_desktop
+			COMMAND sed -i -e 's/Name=NP21kai/Name=NP21kai\(SDL1\)/g' ${NP2kai_BINARY_DIR}/np21kai_rg350_sdl1_opk/default_opendingux_np21kai_desktop
 			COMMAND sed -i -e 's/Exec=np21kai/Exec=np21kai_rg350_sdl1/g' ${NP2kai_BINARY_DIR}/np21kai_rg350_sdl1_opk/default_opendingux_np21kai_desktop
 			COMMAND mv ${NP2kai_BINARY_DIR}/np21kai_rg350_sdl1_opk/default_opendingux_np21kai_desktop ${NP2kai_BINARY_DIR}/np21kai_rg350_sdl1_opk/default_opendingux_np21kai_rg350_sdl1.desktop
 			COMMAND mksquashfs ${NP2kai_BINARY_DIR}/np21kai_rg350_sdl1_opk ${NP2kai_BINARY_DIR}/np21kai_rg350_sdl1.opk -all-root -noappend -no-exports
@@ -989,7 +1007,7 @@ if(CMAKE_CROSSCOMPILING)
 			COMMAND cp -r ${NP2kai_SOURCE_DIR}/sdl/opendingux/opk ${NP2kai_BINARY_DIR}/np2kai_rs90_sdl1_opk
 			COMMAND mv np2kai_rs90_sdl1.opk ${NP2kai_BINARY_DIR}/np2kai_rs90_sdl1_opk/
 			COMMAND rm ${NP2kai_BINARY_DIR}/np2kai_rs90_sdl1_opk/default_opendingux_np21kai_desktop
-			COMMAND sed -i -e 's/Name=NP2kai/Name=NP2kai(SDL1)/g' ${NP2kai_BINARY_DIR}/np2kai_rs90_sdl1_opk/default_opendingux_np2kai_desktop
+			COMMAND sed -i -e 's/Name=NP2kai/Name=NP2kai\(SDL1\)/g' ${NP2kai_BINARY_DIR}/np2kai_rs90_sdl1_opk/default_opendingux_np2kai_desktop
 			COMMAND sed -i -e 's/Exec=np2kai/Exec=np2kai_rs90_sdl1/g' ${NP2kai_BINARY_DIR}/np2kai_rs90_sdl1_opk/default_opendingux_np2kai_desktop
 			COMMAND mv ${NP2kai_BINARY_DIR}/np2kai_rs90_sdl1_opk/default_opendingux_np2kai_desktop ${NP2kai_BINARY_DIR}/np2kai_rs90_sdl1_opk/default_opendingux_np2kai_rs90_sdl1.desktop
 			COMMAND mksquashfs ${NP2kai_BINARY_DIR}/np2kai_rs90_sdl1_opk ${NP2kai_BINARY_DIR}/np2kai_rs90_sdl1.opk -all-root -noappend -no-exports
@@ -1005,7 +1023,7 @@ if(CMAKE_CROSSCOMPILING)
 			COMMAND cp -r ${NP2kai_SOURCE_DIR}/sdl/opendingux/opk ${NP2kai_BINARY_DIR}/np21kai_rs90_sdl1_opk
 			COMMAND mv np21kai_rs90_sdl1.opk ${NP2kai_BINARY_DIR}/np21kai_rs90_sdl1_opk/
 			COMMAND rm ${NP2kai_BINARY_DIR}/np21kai_rs90_sdl1_opk/default_opendingux_np2kai_desktop
-			COMMAND sed -i -e 's/Name=NP21kai/Name=NP21kai(SDL1)/g' ${NP2kai_BINARY_DIR}/np21kai_rs90_sdl1_opk/default_opendingux_np21kai_desktop
+			COMMAND sed -i -e 's/Name=NP21kai/Name=NP21kai\(SDL1\)/g' ${NP2kai_BINARY_DIR}/np21kai_rs90_sdl1_opk/default_opendingux_np21kai_desktop
 			COMMAND sed -i -e 's/Exec=np21kai/Exec=np21kai_rs90_sdl1/g' ${NP2kai_BINARY_DIR}/np21kai_rs90_sdl1_opk/default_opendingux_np21kai_desktop
 			COMMAND mv ${NP2kai_BINARY_DIR}/np21kai_rs90_sdl1_opk/default_opendingux_np21kai_desktop ${NP2kai_BINARY_DIR}/np21kai_rs90_sdl1_opk/default_opendingux_np21kai_rs90_sdl1.desktop
 			COMMAND mksquashfs ${NP2kai_BINARY_DIR}/np21kai_rs90_sdl1_opk ${NP2kai_BINARY_DIR}/np21kai_rs90_sdl1.opk -all-root -noappend -no-exports
