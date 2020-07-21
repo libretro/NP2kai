@@ -10,6 +10,7 @@
 #if defined(__LIBRETRO__)
 #include <retro_dirent.h>
 #include <file_path.h>
+#include "libretro/libretro_exports.h"
 #if !defined(_MSC_VER)
 #include <unistd.h>
 #endif
@@ -47,7 +48,13 @@ FILEH file_open(const OEMCHAR *path) {
   FILEH hRes = NULL;
 
 #if defined(__LIBRETRO__)
+  if(log_cb) {
+    log_cb(RETRO_LOG_INFO, "Open file (RW) %s.\n", path);
+  }
   hRes = filestream_open(path, RETRO_VFS_FILE_ACCESS_READ_WRITE | RETRO_VFS_FILE_ACCESS_UPDATE_EXISTING, RETRO_VFS_FILE_ACCESS_HINT_NONE);
+  if(!hRes && log_cb) {
+    log_cb(RETRO_LOG_WARN, "Couldn't open file (RW) %s.\n", path);
+  }
 #elif defined(_WINDOWS) && defined(OSLANG_UTF8)
 	wchar_t	wpath[MAX_PATH];
 	codecnv_utf8toucs2(wpath, MAX_PATH, path, -1);
@@ -63,7 +70,13 @@ FILEH file_open_rb(const OEMCHAR *path) {
   FILEH hRes = NULL;
 
 #if defined(__LIBRETRO__)
+  if(log_cb) {
+    log_cb(RETRO_LOG_INFO, "Open file (RO) %s.\n", path);
+  }
   hRes = filestream_open(path, RETRO_VFS_FILE_ACCESS_READ, RETRO_VFS_FILE_ACCESS_HINT_NONE);
+  if(!hRes && log_cb) {
+    log_cb(RETRO_LOG_WARN, "Couldn't open file (RO) %s.\n", path);
+  }
 #elif defined(_WINDOWS) && defined(OSLANG_UTF8)
 	wchar_t	wpath[MAX_PATH];
 	codecnv_utf8toucs2(wpath, MAX_PATH, path, -1);
@@ -79,7 +92,13 @@ FILEH file_create(const OEMCHAR *path) {
   FILEH hRes = NULL;
 
 #if defined(__LIBRETRO__)
+  if(log_cb) {
+    log_cb(RETRO_LOG_INFO, "Open file (W) %s.\n", path);
+  }
 	hRes = filestream_open(path, RETRO_VFS_FILE_ACCESS_READ_WRITE, RETRO_VFS_FILE_ACCESS_HINT_NONE);
+  if(!hRes && log_cb) {
+    log_cb(RETRO_LOG_WARN, "Couldn't open file (W) %s.\n", path);
+  }
 #elif defined(_WINDOWS) && defined(OSLANG_UTF8)
 	wchar_t	wpath[MAX_PATH];
 	codecnv_utf8toucs2(wpath, MAX_PATH, path, -1);
