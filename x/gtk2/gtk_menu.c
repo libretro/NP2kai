@@ -45,6 +45,7 @@
 #if defined(SUPPORT_VIDEOFILTER)
 #include <vram/videofilter.h>
 #endif
+#include <fdd/newdisk.h>
 
 #include <kdispwin.h>
 #include <toolwin.h>
@@ -80,6 +81,17 @@
 #ifdef SUPPORT_NVL_IMAGES
 BOOL nvl_check();
 #endif
+
+void create_hostdrv_dialog(void);
+void create_sound_dialog(void);
+void create_midi_dialog(void);
+void create_serial_dialog(void);
+void create_ide_dialog(void);
+void create_network_dialog(void);
+void create_about_dialog(void);
+void create_screen_dialog(void);
+void create_pci_dialog(void);
+void create_wab_dialog(void);
 
 /* normal */
 static void cb_bmpsave(GtkAction *action, gpointer user_data);
@@ -427,8 +439,10 @@ static GtkRadioActionEntry memory_entries[] = {
 { "64.6mb", NULL, "64.6MB", NULL, NULL, 64 },
 { "120.6mb", NULL, "120.6MB", NULL, NULL, 120 },
 { "230.6mb", NULL, "230.6MB", NULL, NULL, 230 },
+#if defined(SUPPORT_LARGE_MEMORY)
 { "512.6mb", NULL, "512.6MB", NULL, NULL, 512 },
 { "1024.6mb", NULL, "1024.6MB", NULL, NULL, 1024 },
+#endif
 };
 static const guint n_memory_entries = G_N_ELEMENTS(memory_entries);
 
@@ -1657,6 +1671,9 @@ cb_reset(GtkAction *action, gpointer user_data)
 {
 
 	pccore_cfgupdate();
+	if(nevent_iswork(NEVENT_CDWAIT)){
+		nevent_forceexecute(NEVENT_CDWAIT);
+	}
 	pccore_reset();
 }
 

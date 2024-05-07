@@ -66,6 +66,7 @@ static IDEDRV getidedrv(void) {
 static const char serial[] = "824919341192        ";
 static const char firm[] = "A5U.1200";
 static const char model[] = "QUANTUM FIREBALL CR                     ";
+static const char model48[] = "NYANTUM YARNBALL CR                     ";
 
 static const char cdrom_serial[] = "1.0                 ";
 static const char cdrom_firm[]   = "        ";
@@ -77,7 +78,7 @@ static BRESULT setidentify(IDEDRV drv) {
 	UINT16	tmp[256];
 	UINT8	*p;
 	UINT	i;
-	UINT32	size;
+	FILELEN	size;
 
 	sxsi = sxsi_getptr(drv->sxsidrv);
 	if ((sxsi == NULL) || (!(sxsi->flag & SXSIFLAG_READY) && drv->device != IDETYPE_CDROM)) {
@@ -107,13 +108,13 @@ static BRESULT setidentify(IDEDRV drv) {
 		tmp[47] = 0x8000 | IDEIO_MULTIPLE_MAX;	// multiple
 #endif
 		tmp[49] = 0x0200;		// support LBA
-		tmp[51] = 0x0200;
-		tmp[53] = 0x0001;
-		size = sxsi->cylinders * sxsi->surfaces * sxsi->sectors;
-		tmp[54] = size / drv->surfaces / drv->sectors;//sxsi->cylinders;
+		tmp[51] = 0x0278;
+		tmp[53] = 0x0003;
+		size = (FILELEN)sxsi->cylinders * sxsi->surfaces * sxsi->sectors;
+		tmp[54] = (UINT16)(size / drv->surfaces / drv->sectors);//sxsi->cylinders;
 		tmp[55] = drv->surfaces;//sxsi->surfaces;
 		tmp[56] = drv->sectors;//sxsi->sectors;
-		size = (UINT32)tmp[54] * tmp[55] * tmp[56];
+		size = (FILELEN)tmp[54] * tmp[55] * tmp[56];
 		tmp[57] = (UINT16)size;
 		tmp[58] = (UINT16)(size >> 16);
 #if IDEIO_MULTIPLE_MAX > 0
@@ -122,10 +123,45 @@ static BRESULT setidentify(IDEDRV drv) {
 		tmp[60] = (UINT16)size;
 		tmp[61] = (UINT16)(size >> 16);
 		tmp[63] = 0x0000;		// no support multiword DMA
-
-		tmp[80] = 0x003e;		// support ATA-1 to 5
+		tmp[64] = 0x0003;		// device supports PIO mode 3, 4
+		
 		tmp[81] = 0;
-		tmp[82] = 0x0200;		// support DEVICE RESET
+		tmp[82] = 0x4200;		// support NOP, DEVICE RESET and Write Cache
+
+#if defined(SUPPORT_IDEIO_48BIT)
+		if(sxsi->totals > 65535*16*255){
+			// 48-bit LBA
+			FILELEN tmpCyl = (UINT32)(sxsi->totals / 255 / 255);
+			tmp[80] = 0x007e;		// support ATA-1 to 6
+			tmp[81] = 0;
+			tmp[82] = 0x0200;		// support DEVICE RESET
+			tmp[83] = 0x4400;		// 48-bit Address feature set supported
+			tmp[86] = 0x4400;		// 48-bit Address feature set supported
+			tmp[100] = (UINT16)(sxsi->totals);			// Maximum user LBA for 48-bit Address feature set 1
+			tmp[101] = (UINT16)(sxsi->totals >> 16);	// Maximum user LBA for 48-bit Address feature set 2
+			tmp[102] = (UINT16)(sxsi->totals >> 32);	// Maximum user LBA for 48-bit Address feature set 3
+			tmp[103] = (UINT16)(sxsi->totals >> 48);	// Maximum user LBA for 48-bit Address feature set 4
+			if(tmp[102] || tmp[103] || (tmp[101] & 0xf000)){
+				tmp[60] = (UINT16)0xffff;
+				tmp[61] = (UINT16)0xfff;
+			}else{
+				tmp[60] = tmp[100];
+				tmp[61] = tmp[101];
+			}
+			tmp[54] = (UINT16)(tmpCyl < 0xffff ? tmpCyl : 0xffff);
+			tmp[55] = 255;
+			tmp[56] = 255;
+			size = (FILELEN)tmp[54] * tmp[55] * tmp[56];
+			tmp[57] = (UINT16)size;
+			tmp[58] = (UINT16)(size >> 16);
+			for (i=0; i<20; i++) {
+				tmp[27+i] = (model48[i*2] << 8) + model48[i*2+1];
+			}
+		}
+#endif
+		{
+			tmp[80] = 0x003e;		// support ATA-1 to 5
+		}
 	}
 	else if (drv->device == IDETYPE_CDROM) {
 		tmp[0] = 0x8580;		// ATAPI,CD-ROM,removable,12bytes PACKET
@@ -140,8 +176,10 @@ static BRESULT setidentify(IDEDRV drv) {
 			tmp[27+i] = (cdrom_model[i*2] << 8) + cdrom_model[i*2+1];
 		}
 		tmp[49] = 0x0200;		// support LBA
-		tmp[53] = 0x0001;
+		tmp[51] = 0x0278;
+		tmp[53] = 0x0003;
 		tmp[63] = 0x0000;		// no support multiword DMA
+		tmp[64] = 0x0003;		// device supports PIO mode 3, 4
 		tmp[80] = 0x003e;		// support ATA-1 to 5
 		tmp[82] = 0x0214;		// support PACKET/DEVICE RESET
 		tmp[126] = 0x0000;		// ATAPI byte count
@@ -284,6 +322,9 @@ static void cmdabort(IDEDRV drv) {
 	TRACEOUT(("ideio: cmdabort()"));
 	drv->status = IDESTAT_DRDY | IDESTAT_ERR;
 	drv->error = IDEERR_ABRT;
+#if defined(SUPPORT_IDEIO_48BIT)
+	drv->lba48mode = 0;
+#endif
 	setintr(drv);
 }
 
@@ -301,6 +342,11 @@ static void drvreset(IDEDRV drv) {
 		drv->sc = 0x01;
 		drv->sn = 0x01;
 		drv->cy = 0x0000;
+#if defined(SUPPORT_IDEIO_48BIT)
+		drv->lba48[1] = drv->lba48[2] = drv->lba48[3] = drv->lba48[4] = drv->lba48[5] = 0;
+		drv->lba48[0] = 1;
+		drv->lba48sc = 0x0001;
+#endif
 		//drv->status = IDESTAT_DRDY;
 		drv->status = IDESTAT_DRDY | IDESTAT_DSC;
 	}
@@ -326,7 +372,7 @@ static void incsec(IDEDRV drv) {
 
 	if (!(drv->dr & IDEDEV_LBA)) {
 		drv->sn++;
-		if (drv->sn <= drv->sectors) {
+		if (drv->sn <= drv->sectors && drv->sn!=0) {
 			return;
 		}
 		drv->sn = 1;
@@ -338,6 +384,18 @@ static void incsec(IDEDRV drv) {
 		drv->cy++;
 	}
 	else {
+#if defined(SUPPORT_IDEIO_48BIT)
+		// 48-bit Address feature set
+		{
+			int i;
+			for(i=0;i<6;i++){
+				drv->lba48[i]++;
+				if (drv->lba48[i]) {
+					break;
+				}
+			}
+		}
+#endif
 		drv->sn++;
 		if (drv->sn) {
 			return;
@@ -352,6 +410,10 @@ static void incsec(IDEDRV drv) {
 
 void ideio_setcursec(FILEPOS pos) {
 	IDEDRV drv;
+#if defined(SUPPORT_IDEIO_48BIT)
+	int shift = 0;
+	int i;
+#endif
 	drv = getidedrv();
 	if (drv) {
 		if (!(drv->dr & IDEDEV_LBA)) {
@@ -365,24 +427,44 @@ void ideio_setcursec(FILEPOS pos) {
 			drv->sn = (pos & 0xff);
 			drv->cy = ((pos >> 8) & 0xffff);
 			drv->hd = ((pos >> 24) & 0xff);
+
+#if defined(SUPPORT_IDEIO_48BIT)
+			// 48-bit Address feature set
+			for(i=0;i<6;i++){
+				drv->lba48[i] = (pos >> shift) & 0xff;
+				shift += 8;
+			}
+#endif
 		}
 	}
 }
 static FILEPOS getcursec(const IDEDRV drv) {
 
 	FILEPOS	ret;
-
-	if (!(drv->dr & IDEDEV_LBA)) {
-		ret = drv->cy;
-		ret *= drv->surfaces;
-		ret += drv->hd;
-		ret *= drv->sectors;
-		ret += (drv->sn - 1);
-	}
-	else {
-		ret = drv->sn;
-		ret |= (drv->cy << 8);
-		ret |= (drv->hd << 24);
+	
+#if defined(SUPPORT_IDEIO_48BIT)
+	if(drv->lba48mode){
+		int i;
+		ret = 0;
+		for(i=0;i<6;i++){
+			ret <<= 8;
+			ret |= drv->lba48[5-i];
+		}
+	}else
+#endif
+	{
+		if (!(drv->dr & IDEDEV_LBA)) {
+			ret = drv->cy;
+			ret *= drv->surfaces;
+			ret += drv->hd;
+			ret *= drv->sectors;
+			ret += (drv->sn - 1);
+		}
+		else {
+			ret = drv->sn;
+			ret |= (drv->cy << 8);
+			ret |= (drv->hd << 24);
+		}
 	}
 	return(ret);
 }
@@ -397,28 +479,24 @@ static void readsec(IDEDRV drv) {
 	sec = getcursec(drv);
 	//TRACEOUT(("readsec->drv %d sec %x cnt %d thr %d",
 	//							drv->sxsidrv, sec, drv->mulcnt, drv->multhr));
-	if (sxsi_read(drv->sxsidrv, sec, drv->buf, 512)) {
-		TRACEOUT(("read error!"));
-		goto read_err;
-	}
-	drv->bufdir = IDEDIR_IN;
-	drv->buftc = IDETC_TRANSFEREND;
-	drv->bufpos = 0;
-	drv->bufsize = 512;
-	// READはI/Oポートで読み取るデータが準備できたら割り込み
-	if ((drv->mulcnt & (drv->multhr - 1)) == 0) {
+	if (1) {
 		drv->status = IDESTAT_DRDY | IDESTAT_DSC | IDESTAT_DRQ;
 		drv->error = 0;
-		if(ideio.rwait > 0){
-			drv->status |= IDESTAT_BSY;
-			drv->status &= ~IDESTAT_DRQ;
-			setdintr(drv, 0, 0, ideio.rwait);
-		}else{
-			setintr(drv);
+		if(drv->mulcnt == 0){ // READ MULTIPLEではブロック単位で割り込み
+			if(ideio.rwait > 0){
+				drv->status |= IDESTAT_BSY;
+				drv->status &= ~IDESTAT_DRQ;
+				setdintr(drv, 0, 0, ideio.rwait);
+			}else{
+				setintr(drv);
+			}
+			//setintr(drv);
 		}
-		//setintr(drv);
 	}
 	drv->mulcnt++;
+	if(drv->mulcnt >= drv->multhr){
+		drv->mulcnt = 0;
+	}
 	return;
 
 read_err:
@@ -435,7 +513,7 @@ static void writeinit(IDEDRV drv) {
 	drv->bufpos = 0;
 	drv->bufsize = 512;
 
-	if ((drv->mulcnt & (drv->multhr - 1)) == 0) {
+	if (1) {
 		drv->status = IDESTAT_DRDY | IDESTAT_DSC | IDESTAT_DRQ;
 		drv->error = 0;
 	}
@@ -457,19 +535,20 @@ static void writesec(IDEDRV drv) {
 	drv->bufsize = 512;
 	
 	// WRITEはデータ書き込みが完了したら割り込み
-	if ((drv->mulcnt & (drv->multhr - 1)) == 0) {
-		drv->status = IDESTAT_DRDY | IDESTAT_DSC | IDESTAT_DRQ;
-		drv->error = 0;
-		setintr(drv);
-		//if(ideio.bios == IDETC_BIOS && ideio.wwait > 0){
-		//	drv->status &= ~IDESTAT_DRQ;
-		//	drv->status |= IDESTAT_BSY;
-		//	setdintr(drv, 0, 0, ideio.wwait);
-		//}else{
-		//	setintr(drv);
-		//}
-	}else{
-		drv->status &= ~IDESTAT_BSY;
+	drv->status = IDESTAT_DRDY | IDESTAT_DSC | IDESTAT_DRQ;
+	drv->error = 0;
+	drv->mulcnt++;
+	if(drv->mulcnt >= drv->multhr){
+		drv->mulcnt = 0;
+	}
+	if(drv->mulcnt == 0){ // WRITE MULTIPLEの時はブロック書き込み完了時に割り込み -> 最後の割り込みはideio_w16()内に存在
+		if(ideio.wwait > 0){
+			drv->status |= IDESTAT_BSY;
+			drv->status &= ~IDESTAT_DRQ;
+			setdintr(drv, 0, 0, ideio.wwait);
+		}else{
+			setintr(drv);
+		}
 	}
 	return;
 
@@ -484,6 +563,10 @@ static void IOOUTCALL ideio_o430(UINT port, REG8 dat) {
 
 	TRACEOUT(("ideio setbank%d %.2x [%.4x:%.8x]",
 									(port >> 1) & 1, dat, CPU_CS, CPU_EIP));
+#if !defined(NP2_X) && !defined(NP2_SDL) && !defined(__LIBRETRO__)
+	atapi_dataread_asyncwait(INFINITE);
+#endif
+
 	if (!(dat & 0x80)) {
 		//char buf[100] = {0};
 		if ((port >> 1) & 1) {
@@ -496,6 +579,12 @@ static void IOOUTCALL ideio_o430(UINT port, REG8 dat) {
 		}
 		//sprintf(buf, "0x%x¥n", dat);
 		//OutputDebugStringA(buf);
+	}
+	
+	// XXX: WORKAROUND for WinNT4.0 正常な接続フラグに書き戻す
+	if(mem[0x05bb]){
+		mem[0x05ba] = mem[0x05bb];
+		mem[0x05bb] = 0;
 	}
 }
 
@@ -587,6 +676,10 @@ static void IOOUTCALL ideio_o644(UINT port, REG8 dat) {
 	drv = getidedrv();
 	if (drv) {
 		drv->sc = dat;
+#if defined(SUPPORT_IDEIO_48BIT)
+		drv->lba48sc <<= 8;
+		drv->lba48sc |= dat;
+#endif
 		TRACEOUT(("ideio set SC %.2x [%.4x:%.8x]", dat, CPU_CS, CPU_EIP));
 	}
 	(void)port;
@@ -599,6 +692,10 @@ static void IOOUTCALL ideio_o646(UINT port, REG8 dat) {
 	drv = getidedrv();
 	if (drv) {
 		drv->sn = dat;
+#if defined(SUPPORT_IDEIO_48BIT)
+		drv->lba48[3] = drv->lba48[0];
+		drv->lba48[0] = dat;
+#endif
 		TRACEOUT(("ideio set SN %.2x [%.4x:%.8x]", dat, CPU_CS, CPU_EIP));
 	}
 	(void)port;
@@ -612,6 +709,10 @@ static void IOOUTCALL ideio_o648(UINT port, REG8 dat) {
 	if (drv) {
 		drv->cy &= 0xff00;
 		drv->cy |= dat;
+#if defined(SUPPORT_IDEIO_48BIT)
+		drv->lba48[4] = drv->lba48[1];
+		drv->lba48[1] = dat;
+#endif
 		TRACEOUT(("ideio set CYL %.2x [%.4x:%.8x]", dat, CPU_CS, CPU_EIP));
 	}
 	(void)port;
@@ -625,6 +726,10 @@ static void IOOUTCALL ideio_o64a(UINT port, REG8 dat) {
 	if (drv) {
 		drv->cy &= 0x00ff;
 		drv->cy |= dat << 8;
+#if defined(SUPPORT_IDEIO_48BIT)
+		drv->lba48[5] = drv->lba48[2];
+		drv->lba48[2] = dat;
+#endif
 		TRACEOUT(("ideio set CYH %.2x [%.4x:%.8x]", dat, CPU_CS, CPU_EIP));
 	}
 	(void)port;
@@ -634,6 +739,10 @@ static void IOOUTCALL ideio_o64c(UINT port, REG8 dat) {
 
 	IDEDEV	dev;
 	UINT	drvnum;
+	
+#if !defined(NP2_X) && !defined(NP2_SDL) && !defined(__LIBRETRO__)
+	atapi_dataread_asyncwait(INFINITE);
+#endif
 
 	dev = getidedev();
 	if (dev == NULL) {
@@ -653,6 +762,14 @@ static void IOOUTCALL ideio_o64c(UINT port, REG8 dat) {
 		//if(!drvnum) dev->drv[drvnum].error |= IDEERR_BBK;
 	}
 	dev->drv[drvnum].dr = dat & 0xf0;
+//#if defined(SUPPORT_IDEIO_48BIT)
+//	{
+//		SXSIDEV sxsi = sxsi_getptr(dev->drv[drvnum].sxsidrv);
+//		if(sxsi->totals > 65535*16*255){
+//			dev->drv[drvnum].dr |= IDEDEV_LBA;
+//		}
+//	}
+//#endif
 	dev->drv[drvnum].hd = dat & 0x0f;
 	dev->drivesel = drvnum;
 	TRACEOUT(("ideio set DRHD %.2x [%.4x:%.8x]", dat, CPU_CS, CPU_EIP));
@@ -665,6 +782,10 @@ static void IOOUTCALL ideio_o64e(UINT port, REG8 dat) {
 	IDEDRV	drv, d;
 	IDEDEV	dev;
 	int		i;
+	
+#if !defined(NP2_X) && !defined(NP2_SDL) && !defined(__LIBRETRO__)
+	atapi_dataread_asyncwait(INFINITE);
+#endif
 
 	// execute device diagnostic
 	if (dat == 0x90) {
@@ -725,6 +846,9 @@ static void IOOUTCALL ideio_o64e(UINT port, REG8 dat) {
 				//drv->hd = 0x00;
 				//drv->sc = 0x00;
 				drv->cy = 0x0000;
+#if defined(SUPPORT_IDEIO_48BIT)
+				drv->lba48[0] = drv->lba48[1] = drv->lba48[2] = drv->lba48[3] = drv->lba48[4] = drv->lba48[5] = 0;
+#endif
 				//if (!(drv->dr & IDEDEV_LBA)) {
 				//	drv->sn = 0x01;
 				//}
@@ -837,7 +961,7 @@ static void IOOUTCALL ideio_o64e(UINT port, REG8 dat) {
 			if (drv->device == IDETYPE_HDD) {
 				drv->mulcnt = 0;
 				drv->multhr = drv->mulmode;
-				writesec(drv);
+				writeinit(drv);
 				break;
 			}
 #endif
@@ -869,6 +993,9 @@ static void IOOUTCALL ideio_o64e(UINT port, REG8 dat) {
 
 		case 0xe0:		// STANDBY IMMEDIATE
 			TRACEOUT(("ideio: STANDBY IMMEDIATE dr = %.2x", drv->dr));
+			if(!(drv->status & IDESTAT_BSY)){
+				setintr(drv);
+			}
 			//cmdabort(drv);
 			break;
 
@@ -892,9 +1019,11 @@ static void IOOUTCALL ideio_o64e(UINT port, REG8 dat) {
 
 		case 0xe7:		// flush cache
 			TRACEOUT(("ideio: flush cache"));
-			drv->status = IDESTAT_DRDY;
+			if(!(drv->status & IDESTAT_BSY)){
+				drv->status = IDESTAT_DRDY|IDESTAT_BSY;
+				setdintr2(drv, 0, 0, 20000);
+			}
 			drv->error = 0;
-			setintr(drv);
 			break;
 
 		case 0xec:		// identify device
@@ -915,24 +1044,43 @@ static void IOOUTCALL ideio_o64e(UINT port, REG8 dat) {
 
 		case 0xef:		// set features
 			TRACEOUT(("ideio: set features reg = %.2x", drv->wp));
-			//if(drv->device == IDETYPE_CDROM){
-			//	switch(drv->wp) {
-			//	case 0x95: // Enable Media Status Notification
-			//		ideio_mediastatusnotification[drv->sxsidrv] = 1;
-			//		drv->status = IDESTAT_DRDY | IDESTAT_DSC | IDESTAT_DRQ;
-			//		drv->error = 0;
-			//		break;
-			//	case 0x31: // Disable Media Status Notification
-			//		ideio_mediastatusnotification[drv->sxsidrv] = 0;
-			//		drv->status = IDESTAT_DRDY | IDESTAT_DSC | IDESTAT_DRQ;
-			//		drv->error = 0;
-			//		break;
-			//	default:
-			//		cmdabort(drv);
-			//	}
-			//}else{
-				cmdabort(drv);
-			//}
+			if(drv->device == IDETYPE_CDROM){
+				switch(drv->wp) {
+				//case 0x95: // Enable Media Status Notification
+				//	ideio_mediastatusnotification[drv->sxsidrv] = 1;
+				//	drv->status = IDESTAT_DRDY | IDESTAT_DSC | IDESTAT_DRQ;
+				//	drv->error = 0;
+				//	break;
+				//case 0x31: // Disable Media Status Notification
+				//	ideio_mediastatusnotification[drv->sxsidrv] = 0;
+				//	drv->status = IDESTAT_DRDY | IDESTAT_DSC | IDESTAT_DRQ;
+				//	drv->error = 0;
+				//	break;
+				default:
+					cmdabort(drv);
+				}
+			}else{
+				switch(drv->wp) {
+				case 0x02: // Enable write cache
+				case 0x82: // Disable write cache
+					// nothing to do
+					drv->status = IDESTAT_DRDY | IDESTAT_DSC | IDESTAT_DRQ;
+					drv->error = 0;
+					if(!(drv->status & IDESTAT_BSY)){
+						setintr(drv);
+					}
+					break;
+				case 0x03: // Set transfer mode based on value in Sector Count register
+					drv->status = IDESTAT_DRDY | IDESTAT_DSC | IDESTAT_DRQ;
+					drv->error = 0;
+					if(!(drv->status & IDESTAT_BSY)){
+						setintr(drv);
+					}
+					break;
+				default:
+					cmdabort(drv);
+				}
+			}
 			break;
 			
 		case 0xda:		// GET MEDIA STATUS
@@ -957,18 +1105,131 @@ static void IOOUTCALL ideio_o64e(UINT port, REG8 dat) {
 
 		case 0xde:		// media lock
 			TRACEOUT(("ideio: media lock dev=%d", drv->device));
-			//cmdabort(drv);
+			if (drv->device == IDETYPE_HDD) {
+				cmdabort(drv);
+			}
+			else {
+				drv->status |= IDESTAT_DRDY;
+				drv->status &= ~(IDESTAT_BSY|IDESTAT_DWF|IDESTAT_DRQ|IDESTAT_ERR);
+				setintr(drv);
+			}
 			break;
 
 		case 0xdf:		// media unlock
 			TRACEOUT(("ideio: media unlock dev=%d", drv->device));
-			//cmdabort(drv);
+			if (drv->device == IDETYPE_HDD) {
+				cmdabort(drv);
+			}
+			else {
+				drv->status |= IDESTAT_DRDY;
+				drv->status &= ~(IDESTAT_BSY|IDESTAT_DWF|IDESTAT_DRQ|IDESTAT_ERR);
+				setintr(drv);
+			}
 			break;
 
 		case 0xf8:		// READ NATIVE MAX ADDRESS
 			TRACEOUT(("ideio: READ NATIVE MAX ADDRESS reg = %.2x", drv->wp));
+			{
+				SXSIDEV sxsi;
+				sxsi = sxsi_getptr(drv->sxsidrv);
+				drv->sn = sxsi->totals & 0xff;
+				drv->cy = (sxsi->totals >> 8) & 0xffff;
+				drv->hd = (drv->hd & 0xf0) | ((sxsi->totals >> 24) & 0xf);
+
+				if(!(drv->status & IDESTAT_BSY)){
+					setintr(drv);
+				}
+			}
+			
+#if defined(SUPPORT_IDEIO_48BIT)
+		case 0x24:		// read EXT
+			TRACEOUT(("ideio: read sector EXT"));
+			if (drv->device == IDETYPE_HDD) {
+				drv->mulcnt = 0;
+				drv->multhr = 1;
+				drv->lba48mode = 1;
+				readsec(drv);
+			}
+			else {
+				cmdabort(drv);
+			}
+			break;
+
+		case 0x34:		// write EXT
+			TRACEOUT(("ideio: write sector EXT"));
+			if (drv->device == IDETYPE_HDD) {
+				drv->mulcnt = 0;
+				drv->multhr = 1;
+				drv->lba48mode = 1;
+				writeinit(drv);
+			}
+			else {
+				cmdabort(drv);
+			}
+			break;
+		case 0x42:		// read EXT verify(w)
+			TRACEOUT(("ideio: read verify EXT"));
+			drv->status = drv->status & ~IDESTAT_BSY;
+			setintr(drv);
+			break;
+
+		case 0x29:		// read multiple EXT
+			TRACEOUT(("ideio: read multiple EXT"));
+#if IDEIO_MULTIPLE_MAX > 0
+			if (drv->device == IDETYPE_HDD) {
+				drv->mulcnt = 0;
+				drv->multhr = drv->mulmode;
+				drv->lba48mode = 1;
+				readsec(drv);
+				break;
+			}
+#endif
 			cmdabort(drv);
 			break;
+
+		case 0x39:		// write multiple EXT
+			TRACEOUT(("ideio: write multiple EXT"));
+#if IDEIO_MULTIPLE_MAX > 0
+			if (drv->device == IDETYPE_HDD) {
+				drv->mulcnt = 0;
+				drv->multhr = drv->mulmode;
+				drv->lba48mode = 1;
+				writesec(drv);
+				break;
+			}
+#endif
+			cmdabort(drv);
+			break;
+
+		case 0xea:		// flush cache EXT
+			TRACEOUT(("ideio: flush cache EXT"));
+			if(!(drv->status & IDESTAT_BSY)){
+				drv->status = IDESTAT_DRDY|IDESTAT_BSY;
+				setdintr2(drv, 0, 0, 20000);
+			}
+			drv->error = 0;
+			break;
+
+		case 0x27:		// READ NATIVE MAX ADDRESS EXT
+			TRACEOUT(("ideio: READ NATIVE MAX ADDRESS EXT reg = %.2x", drv->wp));
+			{
+				SXSIDEV sxsi;
+				sxsi = sxsi_getptr(drv->sxsidrv);
+				if(drv->ctrl & 0x80){ // HOB bit
+					drv->sn = (sxsi->totals >> 24) & 0xff;
+					drv->cy = (sxsi->totals >> 32) & 0xffff;
+				}else{
+					drv->sn = sxsi->totals & 0xff;
+					drv->cy = (sxsi->totals >> 8) & 0xffff;
+				}
+				if(!(drv->status & IDESTAT_BSY)){
+					setintr(drv);
+				}
+			}
+			//cmdabort(drv);
+			break;
+
+#endif
 			
 		default:
 			panic("ideio: unknown command %.2x", dat);
@@ -1241,7 +1502,9 @@ void IOOUTCALL ideio_w16(UINT port, REG16 value) {
 			switch(drv->cmd) {
 				case 0x30:
 				case 0x31:
+				case 0x34:
 				case 0xc5:
+				case 0x39:
 					drv->status |= IDESTAT_BSY;
 					sec = getcursec(drv);
 					//TRACEOUT(("writesec->drv %d sec %x cnt %d thr %d",
@@ -1251,18 +1514,38 @@ void IOOUTCALL ideio_w16(UINT port, REG16 value) {
 						cmdabort(drv);
 						break;
 					}
-					drv->mulcnt++;
 					incsec(drv);
-					drv->sc--;
-					if (drv->sc) {
-						writesec(drv);
-					}else{
-						// 1セクタ書き込み完了
-						if(ideio.bios == IDETC_BIOS && ideio.wwait > 0){
-							setdintr2(drv, 0, 0, ideio.wwait);
+#if defined(SUPPORT_IDEIO_48BIT)
+					if(drv->lba48mode){
+						drv->lba48sc--;
+						drv->sc = (UINT8)drv->lba48sc;
+						if (drv->lba48sc) {
+							writesec(drv);
 						}else{
-							setintr(drv);
-							drv->status &= ~(IDESTAT_BSY);
+							// セクタ書き込み完了
+							if(ideio.wwait > 0){
+								setdintr2(drv, 0, 0, ideio.wwait);
+							}else{
+								setintr(drv);
+								drv->status &= ~(IDESTAT_BSY);
+							}
+							drv->sc = 0;
+							drv->lba48mode = 0;
+						}
+					}else
+#endif
+					{
+						drv->sc--;
+						if (drv->sc) {
+							writesec(drv);
+						}else{
+							// セクタ書き込み完了
+							if(ideio.wwait > 0){
+								setdintr2(drv, 0, 0, ideio.wwait);
+							}else{
+								setintr(drv);
+								drv->status &= ~(IDESTAT_BSY);
+							}
 						}
 					}
 					break;
@@ -1301,17 +1584,36 @@ REG16 IOINPCALL ideio_r16(UINT port) {
 			switch(drv->cmd) {
 				case 0x20:
 				case 0x21:
+				case 0x24:
 				case 0xc4:
+				case 0x29:
 					incsec(drv);
-					drv->sc--;
-					if (drv->sc) {
-						readsec(drv);
-					}else{
-						// 読み取り終わり
+#if defined(SUPPORT_IDEIO_48BIT)
+					if(drv->lba48mode){
+						drv->lba48sc--;
+						drv->sc = (UINT8)drv->lba48sc;
+						if (drv->lba48sc) {
+							readsec(drv);
+						}else{
+							// 読み取り終わり
+							drv->lba48mode = 0;
+						}
+					}else
+#endif
+					{
+						drv->sc--;
+						if (drv->sc) {
+							readsec(drv);
+						}else{
+							// 読み取り終わり
+						}
 					}
 					break;
 
 				case 0xa0:
+					if (drv->status & IDESTAT_BSY) {
+						break;
+					}
 					if (drv->buftc == IDETC_ATAPIREAD) {
 						atapi_dataread(drv);
 						break;
@@ -1365,7 +1667,7 @@ static SINT32	sampcount2_n = 0;
 	//		if(cdda_softvolumereg_L & 0x80){ // CD L Mute
 	//			cdda_softvolume_L = 0;
 	//		}else{
-	//			cdda_softvolume_L = ((‾cdda_softvolumereg_L) & 0x1f); // CD L Volume
+	//			cdda_softvolume_L = ((~cdda_softvolumereg_L) & 0x1f); // CD L Volume
 	//		}
 	//	}
 	//	if(cdda_softvolumereg_R != cs4231.devvolume[0x33]){
@@ -1373,7 +1675,7 @@ static SINT32	sampcount2_n = 0;
 	//		if(cdda_softvolumereg_R & 0x80){ // CD R Mute
 	//			cdda_softvolume_R = 0;
 	//		}else{
-	//			cdda_softvolume_R = ((‾cdda_softvolumereg_R) & 0x1f); // CD R Volume
+	//			cdda_softvolume_R = ((~cdda_softvolumereg_R) & 0x1f); // CD R Volume
 	//		}
 	//	}
 	//}else{
@@ -1404,14 +1706,14 @@ static SINT32	sampcount2_n = 0;
 					sampr = ((SINT8)ptr[3] << 8) + ptr[2];
 					ptr += 4;
 					sampcount2_n += samplen_n;
-					buf_l += (SINT)((int)(sampl)*np2cfg.davolume*cdda_softvolume_L/255/31);
-					buf_r += (SINT)((int)(sampr)*np2cfg.davolume*cdda_softvolume_R/255/31);
+					buf_l += (SINT)((int)(sampl)*((int)np2cfg.davolume * np2cfg.vol_master / 100)*cdda_softvolume_L/255/31);
+					buf_r += (SINT)((int)(sampr)*((int)np2cfg.davolume * np2cfg.vol_master / 100)*cdda_softvolume_R/255/31);
 					buf_count++;
 					if(sampcount2_n > sampcount2_d){
 						pcm[0] += buf_l / buf_count;
 						pcm[1] += buf_r / buf_count;
-						//pcm[0] += (SINT)((int)(sampl)*np2cfg.davolume/255);
-						//pcm[1] += (SINT)((int)(sampr)*np2cfg.davolume/255);
+						//pcm[0] += (SINT)((int)(sampl)*((int)np2cfg.davolume * np2cfg.vol_master / 100)/255);
+						//pcm[1] += (SINT)((int)(sampr)*((int)np2cfg.davolume * np2cfg.vol_master / 100)/255);
 						pcm += 2 * (sampcount2_n / sampcount2_d);
 						--r;
 						sampcount2_n = sampcount2_n % sampcount2_d;
@@ -1424,8 +1726,8 @@ static SINT32	sampcount2_n = 0;
 				do {
 					sampl = ((SINT8)ptr[1] << 8) + ptr[0];
 					sampr = ((SINT8)ptr[3] << 8) + ptr[2];
-					pcm[0] += (SINT)((int)(sampl)*np2cfg.davolume*cdda_softvolume_L/255/31);
-					pcm[1] += (SINT)((int)(sampr)*np2cfg.davolume*cdda_softvolume_L/255/31);
+					pcm[0] += (SINT)((int)(sampl)*((int)np2cfg.davolume * np2cfg.vol_master / 100)*cdda_softvolume_L/255/31);
+					pcm[1] += (SINT)((int)(sampr)*((int)np2cfg.davolume * np2cfg.vol_master / 100)*cdda_softvolume_L/255/31);
 					sampcount2_n -= sampcount2_d;
 					if(sampcount2_n <= 0){
 						sampcount2_n += samplen_n;
@@ -1535,6 +1837,11 @@ static void devinit(IDEDRV drv, REG8 sxsidrv) {
 		drv->error = IDEERR_TR0;
 		drv->device = IDETYPE_NONE;
 	}
+//#if defined(SUPPORT_IDEIO_48BIT)
+//	if(sxsi->totals > 65535*16*255){
+//		drv->dr |= IDEDEV_LBA;
+//	}
+//#endif
 	//memset(ideio_mediastatusnotification, 0, sizeof(ideio_mediastatusnotification));
 	//memset(ideio_mediachangeflag, 0, sizeof(ideio_mediachangeflag));
 }
@@ -1559,7 +1866,7 @@ void ideio_basereset() {
 	if (pccore.hddif & PCHDD_IDE) {
 		int compmode = (sxsi_getdevtype(0)!=SXSIDEV_CDROM && sxsi_getdevtype(1)!=SXSIDEV_CDROM && sxsi_getdevtype(2)==SXSIDEV_CDROM && sxsi_getdevtype(3)!=SXSIDEV_CDROM); // 旧機種互換モード？
 
-		// WinNT4.0でHDDが認識するようになる。Win9xもBIOS I/Oエミュレーションで対応。
+		// WORKAROUND for WinNT4.0
 		if(compmode){
 			mem[0x05ba] = (sxsi_getdevtype(3)==SXSIDEV_HDD ? 0x8 : 0x0)|(sxsi_getdevtype(2)==SXSIDEV_HDD ? 0x4 : 0x0)|
 							(sxsi_getdevtype(1)==SXSIDEV_HDD ? 0x2 : 0x0)|(sxsi_getdevtype(0)==SXSIDEV_HDD ? 0x1 : 0x0);
@@ -1754,7 +2061,7 @@ void ideio_mediachange(REG8 sxsidrv) {
 	//drv->status |= IDESTAT_ERR;
 	//drv->error |= IDEERR_MCNG;
 	//setintr(drv);
-	//drv->error &= ‾IDEERR_MCNG; // 一旦フラグクリア
+	//drv->error &= ~IDEERR_MCNG; // 一旦フラグクリア
 	//drv->media |= IDEIO_MEDIA_CHANGED;
 	//setintr(drv);
 	//ideio_mediachangeflag[sxsidrv] = 1;

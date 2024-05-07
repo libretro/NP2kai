@@ -48,8 +48,8 @@ static void dlginit(void) {
 	menudlg_appends(res_about, NELEMENTS(res_about));
 	milstr_ncpy(work, str_np2, NELEMENTS(work));
 	milstr_ncat(work, str_space, NELEMENTS(work));
-	milstr_ncat(work, NP2VER_CORE, NELEMENTS(work));
-	milstr_ncpy(work2, NP2VER_GIT, NELEMENTS(work2));
+	milstr_ncat(work, NP2KAI_GIT_TAG, NELEMENTS(work));
+	milstr_ncpy(work2, NP2KAI_GIT_HASH, NELEMENTS(work2));
 	menudlg_settext(DID_VER, work);
 	menudlg_settext(DID_VER2, work2);
 }

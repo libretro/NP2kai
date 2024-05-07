@@ -584,9 +584,6 @@ static INITBL iniitem[] = {
 	{"bmap_Dir", INITYPE_STR,	bmpfilefolder,		MAX_PATH},
 	{"fontfile", INITYPE_STR,	np2cfg.fontfile,	MAX_PATH},
 	{"biospath", INIRO_STR,		np2cfg.biospath,	MAX_PATH},
-	{"hdrvroot", INIRO_STR,		np2cfg.hdrvroot,	MAX_PATH},
-	{"hdrv_acc", INIRO_UINT8,	&np2cfg.hdrvacc,	0},
-
 #if defined(SUPPORT_HOSTDRV)
 	{"use_hdrv", INITYPE_BOOL,	&np2cfg.hdrvenable,	0},
 	{"hdrvroot", INITYPE_STR,	&np2cfg.hdrvroot,	MAX_PATH},
@@ -600,7 +597,11 @@ static INITBL iniitem[] = {
 
 	{"DIPswtch", INITYPE_ARGH8,	np2cfg.dipsw,		3},
 	{"MEMswtch", INITYPE_ARGH8,	np2cfg.memsw,		8},
+#if defined(SUPPORT_LARGE_MEMORY)
+	{"ExMemory", INITYPE_UINT16,	&np2cfg.EXTMEM,		13},
+#else
 	{"ExMemory", INIMAX_UINT8,	&np2cfg.EXTMEM,		13},
+#endif
 	{"ITF_WORK", INIRO_BOOL,	&np2cfg.ITF_WORK,	0},
 
 	{"HDD1FILE", INITYPE_STR,	np2cfg.sasihdd[0],	MAX_PATH},
@@ -761,12 +762,14 @@ static INITBL iniitem[] = {
 #if defined(SUPPORT_ASYNC_CPU)
 	{"ASYNCCPU", INITYPE_BOOL,	&np2cfg.asynccpu,	0},
 #endif
+	{"CONSTTSC", INITYPE_BOOL,	&np2cfg.consttsc,	0},
 #if defined(SUPPORT_IDEIO)
 	{"IDEBADDR", INIRO_HEX8,	&np2cfg.idebaddr,	0},
 #endif
 #if defined(SUPPORT_GAMEPORT)
 	{"GAMEPORT", INITYPE_BOOL,	&np2cfg.gameport,	0},
 #endif
+	{"USEMOVCS", INIRO_BOOL,	&np2cfg.allowMOVCS,	0},
 
 	{"keyboard", INITYPE_KB,	&np2oscfg.KEYBOARD,	0},
 	{"F12_COPY", INITYPE_UINT8,	&np2oscfg.F12KEY,	0},
@@ -871,6 +874,10 @@ static INITBL iniitem[] = {
 	{OEMTEXT("vf1_p2_p1"),  INITYPE_ARGU32, np2cfg.vf1_param[2][1],    8},
 	{OEMTEXT("vf1_p2_p2"),  INITYPE_ARGU32, np2cfg.vf1_param[2][2],    8},
 #endif
+	// Keyrepeat
+	{"keyrepeat_enable", INITYPE_BOOL,	&np2cfg.keyrepeat_enable,	0},
+	{"keyrepeat_delay", INITYPE_UINT16,	&np2cfg.keyrepeat_delay,	500},
+	{"keyrepeat_interval", INITYPE_UINT16,	&np2cfg.keyrepeat_interval,	50},
 };
 #define	INIITEMS	(sizeof(iniitem) / sizeof(iniitem[0]))
 

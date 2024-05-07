@@ -44,14 +44,14 @@ static void IOOUTCALL pcm86_oa466(UINT port, REG8 val) {
 	if((g_nSoundID == SOUNDID_WAVESTAR && (val & 0xe0) == 0x00)){
 		UINT i;
 		cs4231.devvolume[0xff] = (~val) & 15;
-		opngen_setvol(np2cfg.vol_fm * cs4231.devvolume[0xff] / 15);
-		psggen_setvol(np2cfg.vol_ssg * cs4231.devvolume[0xff] / 15);
-		rhythm_setvol(np2cfg.vol_rhythm * cs4231.devvolume[0xff] / 15);
+		opngen_setvol(np2cfg.vol_fm * cs4231.devvolume[0xff] / 15 * np2cfg.vol_master / 100);
+		psggen_setvol(np2cfg.vol_ssg * cs4231.devvolume[0xff] / 15 * np2cfg.vol_master / 100);
+		rhythm_setvol(np2cfg.vol_rhythm * cs4231.devvolume[0xff] / 15 * np2cfg.vol_master / 100);
 #if defined(SUPPORT_FMGEN)
 		if(np2cfg.usefmgen) {
-			opna_fmgen_setallvolumeFM_linear(np2cfg.vol_fm * cs4231.devvolume[0xff] / 15);
-			opna_fmgen_setallvolumePSG_linear(np2cfg.vol_ssg * cs4231.devvolume[0xff] / 15);
-			opna_fmgen_setallvolumeRhythmTotal_linear(np2cfg.vol_rhythm * cs4231.devvolume[0xff] / 15);
+			opna_fmgen_setallvolumeFM_linear(np2cfg.vol_fm * cs4231.devvolume[0xff] / 15 * np2cfg.vol_master / 100);
+			opna_fmgen_setallvolumePSG_linear(np2cfg.vol_ssg * cs4231.devvolume[0xff] / 15 * np2cfg.vol_master / 100);
+			opna_fmgen_setallvolumeRhythmTotal_linear(np2cfg.vol_rhythm * cs4231.devvolume[0xff] / 15 * np2cfg.vol_master / 100);
 		}
 #endif
 		for (i = 0; i < NELEMENTS(g_opna); i++)
@@ -79,7 +79,7 @@ static void IOOUTCALL pcm86_oa468(UINT port, REG8 val) {
 		g_pcm86.lastclock = CPU_CLOCK + CPU_BASECLOCK - CPU_REMCLOCK;
 		g_pcm86.lastclock <<= 6;
 	}
-	if ((xchgbit & 0x10) && (!(val & 0x10))) {
+	if (/*(xchgbit & 0x10) &&*/ (!(val & 0x10))) {
 		g_pcm86.irqflag = 0;
 //		g_pcm86.write = 0;
 //		g_pcm86.reqirq = 0;
@@ -179,9 +179,9 @@ static REG8 IOINPCALL pcm86_ia460(UINT port)
 
 static REG8 IOINPCALL pcm86_ia466(UINT port) {
 
-	UINT32	past;
-	UINT32	cnt;
-	UINT32	stepclock;
+	UINT64	past;
+	UINT64	cnt;
+	UINT64	stepclock;
 	REG8	ret;
 	
 	past = CPU_CLOCK + CPU_BASECLOCK - CPU_REMCLOCK;
@@ -193,7 +193,7 @@ static REG8 IOINPCALL pcm86_ia466(UINT port) {
 		g_pcm86.lastclock += (cnt * stepclock);
 		past -= cnt * stepclock;
 		if (g_pcm86.fifo & 0x80) {
-			sound_sync();
+			//sound_sync();
 			RECALC_NOWCLKWAIT(cnt);
 		}
 	}
@@ -201,7 +201,7 @@ static REG8 IOINPCALL pcm86_ia466(UINT port) {
 	if (g_pcm86.virbuf >= PCM86_LOGICALBUF) {			// バッファフル
 		ret |= 0x80;
 	}
-	else if (!g_pcm86.virbuf) {						// バッファ０
+	else if (g_pcm86.virbuf <= 0) {						// バッファ０
 		ret |= 0x40;								// ちと変…
 	}
 	(void)port;

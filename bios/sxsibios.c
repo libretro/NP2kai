@@ -14,10 +14,14 @@
 #if defined(BIOS_IO_EMULATION) && defined(CPUCORE_IA32)
 #include	<bios/bios.h>
 #endif
-// XXX: WORKAROUND for Win9x boot menu
+// XXX: WORKAROUND for Win9x boot menu & PC-98 HDD boot menu
 #include	<keystat.h>
 
+#define SXSIBIOS_WORKSIZE	4096
+
 extern int sxsi_unittbl[];
+
+extern int sxsi_workaround_bootwait;
 
 typedef REG8 (*SXSIFUNC)(UINT type, SXSIDEV sxsi);
 
@@ -29,16 +33,31 @@ static REG8 sxsi_pos(UINT type, SXSIDEV sxsi, FILEPOS *ppos) {
 	ret = 0;
 	pos = 0;
 	if (CPU_AL & 0x80) {
-		if ((CPU_DL >= sxsi->sectors) ||
-			(CPU_DH >= sxsi->surfaces) ||
-			(CPU_CX >= sxsi->cylinders)) {
-			ret = 0xd0;
+#if defined(SUPPORT_IDEIO_48BIT)
+		if(sxsi->totals > 65535*16*255){
+			if (CPU_CX >= sxsi->totals / 255 / 255) {
+				ret = 0xd0;
+			}
+			pos = ((FILEPOS)(CPU_CX * 255) + CPU_DH) * 255 + CPU_DL;
+		}else
+#endif
+		{
+			if ((CPU_DL >= sxsi->sectors) ||
+				(CPU_DH >= sxsi->surfaces) ||
+				(CPU_CX >= sxsi->cylinders)) {
+				ret = 0xd0;
+			}
+			pos = (((FILEPOS)CPU_CX * sxsi->surfaces) + CPU_DH) * sxsi->sectors
+																+ CPU_DL;
 		}
-		pos = ((CPU_CX * sxsi->surfaces) + CPU_DH) * sxsi->sectors
-															+ CPU_DL;
 	}
 	else {
-		pos = (CPU_DL << 16) | CPU_CX;
+		if(sxsi->totals > 0xffffff){
+			// 大容量ディスク用
+			pos = ((FILEPOS)CPU_DX << 16) | CPU_CX;
+		}else{
+			pos = (CPU_DL << 16) | CPU_CX;
+		}
 		if (type == SXSIBIOS_SASI) {
 			pos &= 0x1fffff;
 		}
@@ -48,7 +67,7 @@ static REG8 sxsi_pos(UINT type, SXSIDEV sxsi, FILEPOS *ppos) {
 	}
 
 	*ppos = pos;
-	if (sxsi->size > 1024) {
+	if (sxsi->size > SXSIBIOS_WORKSIZE) {
 		ret = 0xd0;
 	}
 	return(ret);
@@ -61,7 +80,7 @@ static REG8 sasibios_write(UINT type, SXSIDEV sxsi) {
 	FILEPOS	pos;
 	UINT32	addr;
 	UINT	r;
-	UINT8	work[1024];
+	UINT8	work[SXSIBIOS_WORKSIZE];
 
 	size = CPU_BX;
 	if (!size) {
@@ -91,7 +110,7 @@ static REG8 scsibios_write(UINT type, SXSIDEV sxsi) {
 	FILEPOS	pos;
 	UINT32	addr;
 	UINT	r;
-	UINT8	work[1024];
+	UINT8	work[SXSIBIOS_WORKSIZE];
 
 	size = CPU_BX;
 	if (!size) {
@@ -122,7 +141,7 @@ static REG8 sasibios_read(UINT type, SXSIDEV sxsi) {
 	FILEPOS	pos;
 	UINT32	addr;
 	UINT	r;
-	UINT8	work[1024];
+	UINT8	work[SXSIBIOS_WORKSIZE];
 	FILEPOS	posbase;
 	UINT8	oldAL = CPU_AL;
 
@@ -150,32 +169,65 @@ static REG8 sasibios_read(UINT type, SXSIDEV sxsi) {
 	if((oldAL & 0xf0) == 0x80){
 #if defined(BIOS_IO_EMULATION) && defined(CPUCORE_IA32)
 		if (CPU_STAT_PM && CPU_STAT_VM86 && biosioemu.enable) {
-			// for Windows 9x IDE Driver
-			UINT8 sn;
-			UINT16 cy;
-			UINT8 hd;
-			sn = (posbase % sxsi->sectors) + 1;
-			posbase /= sxsi->sectors;
-			hd = (posbase % sxsi->surfaces);
-			posbase /= sxsi->surfaces;
-			cy = posbase & 0xffff;
-			// LIFOなので逆順注意
-			biosioemu_push8(0x644, (CPU_BX / 512) & 0xff); 
-			biosioemu_push8(0x646, sn); 
-			biosioemu_push8(0x64a, ((cy >> 8) & 0xff)); 
-			biosioemu_push8(0x648, (cy & 0xff)); 
-			biosioemu_push8_read(0x64e); 
-			biosioemu_push8(0x64c, 0xA0|((sxsi_unittbl[oldAL & 0x3] & 0x1) << 4)|(hd & 0x0f)); 
-			biosioemu_push8_read(0x432);
-			if ((sxsi_unittbl[oldAL & 0x3] & 0xf) >= 0x2) {
-				biosioemu_push8(0x432, 0x01); // BANK #2
-			}else{
-				biosioemu_push8(0x432, 0x00); // BANK #1 
+#if defined(SUPPORT_IDEIO_48BIT)
+			if(sxsi->totals > 0xffffff){
+				// 大容量ディスク用
+				// for Windows 9x IDE Driver
+				UINT8 sn;
+				UINT16 cy;
+				UINT8 hd;
+				sn = (posbase % 255) + 1;
+				posbase /= 255;
+				hd = (posbase % 255);
+				posbase /= 255;
+				cy = posbase & 0xffff;
+				// LIFOなので逆順注意
+				biosioemu_push8(0x644, (CPU_BX / 512) & 0xff); 
+				biosioemu_push8(0x646, sn); 
+				biosioemu_push8(0x64a, ((cy >> 8) & 0xff)); 
+				biosioemu_push8(0x648, (cy & 0xff)); 
+				biosioemu_push8_read(0x64e); 
+				biosioemu_push8(0x64c, 0xA0|((sxsi_unittbl[oldAL & 0x3] & 0x1) << 4)|(hd & 0x0f)); 
+				biosioemu_push8_read(0x432);
+				if ((sxsi_unittbl[oldAL & 0x3] & 0xf) >= 0x2) {
+					biosioemu_push8(0x432, 0x01); // BANK #2
+				}else{
+					biosioemu_push8(0x432, 0x00); // BANK #1 
+				}
+				biosioemu_push8_read(0x430);
+			}else
+#endif
+			{
+				// for Windows 9x IDE Driver
+				UINT8 sn;
+				UINT16 cy;
+				UINT8 hd;
+				sn = (posbase % sxsi->sectors) + 1;
+				posbase /= sxsi->sectors;
+				hd = (posbase % sxsi->surfaces);
+				posbase /= sxsi->surfaces;
+				cy = posbase & 0xffff;
+				// LIFOなので逆順注意
+				biosioemu_push8(0x644, (CPU_BX / 512) & 0xff); 
+				biosioemu_push8(0x646, sn); 
+				biosioemu_push8(0x64a, ((cy >> 8) & 0xff)); 
+				biosioemu_push8(0x648, (cy & 0xff)); 
+				biosioemu_push8_read(0x64e); 
+				biosioemu_push8(0x64c, 0xA0|((sxsi_unittbl[oldAL & 0x3] & 0x1) << 4)|(hd & 0x0f)); 
+				biosioemu_push8_read(0x432);
+				if ((sxsi_unittbl[oldAL & 0x3] & 0xf) >= 0x2) {
+					biosioemu_push8(0x432, 0x01); // BANK #2
+				}else{
+					biosioemu_push8(0x432, 0x00); // BANK #1 
+				}
+				biosioemu_push8_read(0x430);
 			}
-			biosioemu_push8_read(0x430);
 			
-			// XXX: Win9x用 Workaround 接続フラグ切り替え（NT系はプロテクトモードでBIOSコールしないはず） 
-			mem[0x05ba] = mem[0x05bb];
+			// XXX: WORKAROUND for WinNT4.0 正常な接続フラグに書き戻す
+			if(mem[0x05bb]){
+				mem[0x05ba] = mem[0x05bb];
+				mem[0x05bb] = 0;
+			}
 		}
 #endif
 	}
@@ -189,7 +241,7 @@ static REG8 scsibios_read(UINT type, SXSIDEV sxsi) {
 	FILEPOS	pos;
 	UINT32	addr;
 	UINT	r;
-	UINT8	work[1024];
+	UINT8	work[SXSIBIOS_WORKSIZE];
 	FILEPOS	posbase;
 	UINT8	oldAL = CPU_AL;
 
@@ -349,13 +401,36 @@ static REG8 sasibios_sense(UINT type, SXSIDEV sxsi) {
 		return((REG8)(sxsi->mediatype & 7));
 	}
 	else {
+		unsigned long lbasize;
 		if (CPU_AH == 0x84) {
-			CPU_BX = sxsi->size;
-			CPU_CX = sxsi->cylinders;
-			CPU_DH = sxsi->surfaces;
-			CPU_DL = sxsi->sectors;
+#if defined(SUPPORT_IDEIO_48BIT)
+			if(sxsi->totals > 65535*16*255){
+				FILELEN tmpCyl = (UINT32)(sxsi->totals / 255 / 255);
+				CPU_BX = sxsi->size;
+				CPU_CX = (UINT16)(tmpCyl < 0xffff ? tmpCyl : 0xffff);
+				CPU_DH = 255;
+				CPU_DL = 255;
+			}else
+#endif
+			{
+				CPU_BX = sxsi->size;
+				CPU_CX = sxsi->cylinders;
+				CPU_DH = sxsi->surfaces;
+				CPU_DL = sxsi->sectors;
+			}
 		}
-		return(0x0f);
+		if(sxsi->sectors==33 && sxsi->surfaces <= 8){
+			// SASIっぽい
+			lbasize = sxsi->cylinders * sxsi->surfaces * sxsi->sectors * sxsi->size;
+			if (lbasize < 10475520) return 0;//10MB未満　4*33*310
+			else if (lbasize < 15713280) return 1;//15MB未満　6*33*310
+			else if (lbasize < 20275200) return 2;//20MB未満　8*33*310 →thdの20MBは8:33:300なので調整
+			else if (lbasize < 41564160) return 3;//40MB未満　8*33*615
+			else if (lbasize == 41564160) return 4;//40MB 8*33*615
+			else return 0x0f;
+		}else{
+			return 0x0f;
+		}
 	}
 }
 
@@ -398,9 +473,16 @@ REG8 sasibios_operate(void) {
 	if (sxsi == NULL) {
 		return(0x60);
 	}
-	// XXX: WORKAROUND for Win9x boot menu
-	if(keystat.ref[0x1c] != NKEYREF_NC){
-		CPU_REMCLOCK = -1;
+	// XXX: WORKAROUND for Win9x boot menu & PC-98 HDD boot menu
+	if(sxsi_workaround_bootwait > 0){
+		sxsi_workaround_bootwait--;
+		if(keystat.ref[0x1c] != NKEYREF_NC || keystat.ref[0x0f] != NKEYREF_NC){
+			CPU_REMCLOCK = -1;
+			if((CPU_AH & 0x0f) == 4){ // sasibios_sense
+				keystat.ref[0x1c] = NKEYREF_NC;//keystat_keyup(0x1c);
+				sxsi_workaround_bootwait = 0;
+			}
+		}
 	}
 	return((*sasifunc[CPU_AH & 0x0f])(type, sxsi));
 }

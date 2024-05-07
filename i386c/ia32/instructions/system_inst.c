@@ -355,27 +355,27 @@ MOV_CdRd(void)
 			 * 1 = PVI (protected mode virtual interrupt)
 			 * 0 = VME (VM8086 mode extention)
 			 */
-			reg = 0		/* allow bit */
-#if (CPU_FEATURES & CPU_FEATURE_PGE) == CPU_FEATURE_PGE
-			    | CPU_CR4_PGE
-#endif
-#if (CPU_FEATURES & CPU_FEATURE_VME) == CPU_FEATURE_VME
-			    | CPU_CR4_PVI | CPU_CR4_VME
-#endif
-#if (CPU_FEATURES & CPU_FEATURE_FXSR) == CPU_FEATURE_FXSR
-			    | CPU_CR4_OSFXSR
-#endif
-#if (CPU_FEATURES & CPU_FEATURE_SSE) == CPU_FEATURE_SSE
-			    | CPU_CR4_OSXMMEXCPT
-#endif
-			    | CPU_CR4_PCE
-			;
+			reg = CPU_CR4_PCE;		/* allow bit */
+			if (i386cpuid.cpu_feature & CPU_FEATURE_PGE) {
+				reg |= CPU_CR4_PGE;
+			}
+			if (i386cpuid.cpu_feature & CPU_FEATURE_VME) {
+				reg |= CPU_CR4_PVI | CPU_CR4_VME;
+			}
+			if (i386cpuid.cpu_feature & CPU_FEATURE_FXSR) {
+				reg |= CPU_CR4_OSFXSR;
+			}
+			if (i386cpuid.cpu_feature & CPU_FEATURE_SSE) {
+				reg |= CPU_CR4_OSXMMEXCPT;
+			}
 			if (src & ~reg) {
 				//if (src & 0xfffffc00) {
 				if (src & 0xfffff800) {
 					EXCEPTION(GP_EXCEPTION, 0);
 				}
-				ia32_warning("MOV_CdRd: CR4 <- 0x%08x", src);
+				if ((src & ~reg) != CPU_CR4_DE) { // XXX: debug extentionは警告しない
+					ia32_warning("MOV_CdRd: CR4 <- 0x%08x", src);
+				}
 			}
 
 			reg = CPU_CR4;
@@ -1132,22 +1132,43 @@ WRMSR(void)
 	}
 }
 
+#if defined(SUPPORT_GAMEPORT)
+int gameport_tsccounter = 0;
+#endif
 void
 RDTSC(void)
 {
 #if defined(USE_TSC)
 #if defined(NP2_X) || defined(NP2_SDL) || defined(__LIBRETRO__)
-//	ia32_panic("RDTSC: not implemented yet!");
-	UINT64 tsc_tmp;
-	if(CPU_REMCLOCK != -1){
-		tsc_tmp = CPU_MSR_TSC - CPU_REMCLOCK * pccore.maxmultiple / pccore.multiple;
+#if defined(SUPPORT_ASYNC_CPU)
+	if(np2cfg.consttsc){
+		// CPUクロックに依存しないカウンタ値にする
+		UINT64 tsc_tmp;
+		if(CPU_REMCLOCK != -1){
+			tsc_tmp = CPU_MSR_TSC - CPU_REMCLOCK * pccore.maxmultiple / pccore.multiple;
+		}else{
+			tsc_tmp = CPU_MSR_TSC;
+		}
+		CPU_EDX = ((tsc_tmp >> 32) & 0xffffffff);
+		CPU_EAX = (tsc_tmp & 0xffffffff);
 	}else{
-		tsc_tmp = CPU_MSR_TSC;
+#endif
+		// CPUクロックに依存するカウンタ値にする
+		static UINT64 tsc_last = 0;
+		static UINT64 tsc_cur = 0;
+		UINT64 tsc_tmp;
+		if(CPU_REMCLOCK != -1){
+			tsc_tmp = CPU_MSR_TSC - CPU_REMCLOCK * pccore.maxmultiple / pccore.multiple;
+		}else{
+			tsc_tmp = CPU_MSR_TSC;
+		}
+		tsc_cur += (tsc_tmp - tsc_last) * pccore.multiple / pccore.maxmultiple;
+		tsc_last = tsc_tmp;
+		CPU_EDX = ((tsc_cur >> 32) & 0xffffffff);
+		CPU_EAX = (tsc_cur & 0xffffffff);
+#if defined(SUPPORT_ASYNC_CPU)
 	}
-	//tsc_tmp /= 1000;
-	tsc_tmp = (tsc_tmp >> 8); // XXX: ????
-	CPU_EDX = ((tsc_tmp >> 32) & 0xffffffff);
-	CPU_EAX = (tsc_tmp & 0xffffffff);
+#endif
 #else
 #if defined(SUPPORT_IA32_HAXM)
 	LARGE_INTEGER li = {0};
@@ -1161,16 +1182,38 @@ RDTSC(void)
 #endif
 #endif
 #else
-	UINT64 tsc_tmp;
-	if(CPU_REMCLOCK != -1){
-		tsc_tmp = CPU_MSR_TSC - CPU_REMCLOCK;
+#if defined(SUPPORT_ASYNC_CPU)
+	if(np2cfg.consttsc){
+		// CPUクロックに依存しないカウンタ値にする
+		UINT64 tsc_tmp;
+		if(CPU_REMCLOCK != -1){
+			tsc_tmp = CPU_MSR_TSC - CPU_REMCLOCK * pccore.maxmultiple / pccore.multiple;
+		}else{
+			tsc_tmp = CPU_MSR_TSC;
+		}
+		CPU_EDX = ((tsc_tmp >> 32) & 0xffffffff);
+		CPU_EAX = (tsc_tmp & 0xffffffff);
 	}else{
-		tsc_tmp = CPU_MSR_TSC;
+#endif
+		// CPUクロックに依存するカウンタ値にする
+		static UINT64 tsc_last = 0;
+		static UINT64 tsc_cur = 0;
+		UINT64 tsc_tmp;
+		if(CPU_REMCLOCK != -1){
+			tsc_tmp = CPU_MSR_TSC - CPU_REMCLOCK * pccore.maxmultiple / pccore.multiple;
+		}else{
+			tsc_tmp = CPU_MSR_TSC;
+		}
+		tsc_cur += (tsc_tmp - tsc_last) * pccore.multiple / pccore.maxmultiple;
+		tsc_last = tsc_tmp;
+		CPU_EDX = ((tsc_cur >> 32) & 0xffffffff);
+		CPU_EAX = (tsc_cur & 0xffffffff);
+#if defined(SUPPORT_ASYNC_CPU)
 	}
-	//tsc_tmp /= 1000;
-	tsc_tmp = (tsc_tmp >> 10); // XXX: ????
-	CPU_EDX = ((tsc_tmp >> 32) & 0xffffffff);
-	CPU_EAX = (tsc_tmp & 0xffffffff);
+#endif
+#if defined(SUPPORT_GAMEPORT)
+	if(gameport_tsccounter < INT_MAX) gameport_tsccounter++;
+#endif
 #endif
 //	ia32_panic("RDTSC: not implemented yet!");
 }

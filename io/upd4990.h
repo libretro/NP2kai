@@ -14,19 +14,26 @@ typedef struct {
 	UINT8	regsft;
 } _UPD4990, *UPD4990;
 
+typedef struct {
+	UINT32 hrtimerdiv; 
+	UINT32 hrtimerclock; 
+	UINT32 hrtimerclock32; 
+	
+	UINT32 clockcounter;
+	UINT32 clockcounter32;
+} _UPD4990HRT, *UPD4990HRT;
+
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+	
+#if defined(SUPPORT_HRTIMER)
+void upd4990_hrtimer_count(void);
+#endif
 
 void uPD4990_reset(const NP2CFG *pConfig);
 void uPD4990_bind(void);
-
-#ifdef SUPPORT_HRTIMER
-extern void upd4990_hrtimer_start(void);
-extern void upd4990_hrtimer_stop(void);
-extern void upd4990_hrtimer_count(void);
-#endif	/* SUPPORT_HRTIMER */
 
 #ifdef __cplusplus
 }

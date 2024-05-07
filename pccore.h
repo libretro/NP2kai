@@ -74,6 +74,8 @@ enum tagSoundId
 	SOUNDID_PX1					= 0x30,
 	SOUNDID_PX2					= 0x50,
 #endif
+	
+	SOUNDID_INVALID				= 0xff,		/*!< for new statesave checker */
 };
 typedef enum tagSoundId		SOUNDID;
 
@@ -117,6 +119,7 @@ struct tagNP2Config
 #if defined(SUPPORT_ASYNC_CPU)
 	UINT8	asynccpu; // 非同期CPUモード有効
 #endif
+	UINT8	consttsc; // RDTSCをAsyncクロック変更によらず一定間隔にする
 #if defined(SUPPORT_IDEIO)
 	UINT8	idebaddr; // IDE BIOS アドレス（デフォルト：D8h(D8000h)）
 #endif
@@ -181,6 +184,7 @@ struct tagNP2Config
 	UINT8	vol_adpcm;
 	UINT8	vol_pcm;
 	UINT8	vol_rhythm;
+	UINT8	vol_midi;
 
 	UINT8	mpuenable;
 	UINT8	mpuopt;
@@ -312,6 +316,9 @@ struct tagNP2Config
 #if defined(SUPPORT_GAMEPORT)
 	UINT8	gameport; // 118音源のゲームポートを使用する
 #endif
+	UINT8	allowMOVCS; // mov cs,xx命令の実行を許可する（8086）
+	UINT8	usetexthook; // Text Hookを有効にする（海外向け）
+	UINT8	rascsi92; // 92互換でRaSCSI形式(*.HDN)を読む
 
 #if defined(SUPPORT_DEBUGSS)
 	UINT8	debugss;
@@ -325,6 +332,11 @@ struct tagNP2Config
 	uint8_t  vf1_profile[3][2];
 	uint32_t vf1_param[3][3][8];
 #endif
+
+	// Setting Keyrepeat
+	UINT8	keyrepeat_enable;
+	UINT16	keyrepeat_delay;		// Keyrepeat delay time(ms)
+	UINT16	keyrepeat_interval;		// Keyrepeat interval time(ms)
 };
 typedef struct tagNP2Config  NP2CFG;		/*!< The define of config */
 

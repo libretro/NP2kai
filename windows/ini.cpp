@@ -3,74 +3,17 @@
  *	@brief	設定ファイル アクセスの動作の定義を行います
  */
 
-#include <compiler.h>
-#include <common/strres.h>
-#include <common/profile.h>
-#include <np2.h>
+#include "compiler.h"
+#include "strres.h"
+#include "profile.h"
+#include "np2.h"
 #include "np2arg.h"
-#include <dosio.h>
-#if defined(SUPPORT_BMS)
-#include <io/bmsio.h>
-#endif
-#include <ini.h>
+#include "dosio.h"
+#include "ini.h"
 #include "winkbd.h"
-#include <pccore.h>
+#include "pccore.h"
 
 // ---- user type
-
-/**
- * 32ビット配列を読み込む
- * @param[in] lpString 文字列
- * @param[out] ini 設定テーブル
- */
-static void inirdargu32(LPCTSTR lpString, const PFTBL* ini)
-{
-	uint32_t* lpDst = static_cast<uint32_t*>(ini->value);
-	const int nCount = ini->arg;
-
-	for (int i = 0; i < nCount; i++)
-	{
-		while (*lpString == ' ')
-		{
-			lpString++;
-		}
-
-		if (*lpString == '\0')
-		{
-			break;
-		}
-
-		lpDst[i] = static_cast<uint32_t>(milstr_solveINT(lpString));
-		while (*lpString != '\0')
-		{
-			const TCHAR c = *lpString++;
-			if (c == ',')
-			{
-				break;
-			}
-		}
-	}
-}
-
-/**
- * 32ビット配列を書き込む
- * @param[in] lpString 文字列
- * @param[out] ini 設定テーブル
- */
-static void iniwrargu32(LPTSTR lpString, const PFTBL* ini)
-{
-	uint32_t* lpSrc = static_cast<uint32_t*>(ini->value);
-	const int nCount = ini->arg;
-	TCHAR tmp[256];
-
-	snprintf(tmp, sizeof(tmp), "%d", lpSrc[0]);
-	milstr_ncpy(lpString, tmp, 512);
-	for (int i = 1; i < nCount; i++)
-	{
-		snprintf(tmp, sizeof(tmp), ",%d", lpSrc[i]);
-		milstr_ncat(lpString, tmp, 512);
-	}
-}
 
 /**
  * 16ビット配列を読み込む
@@ -317,11 +260,6 @@ void ini_read(LPCTSTR lpPath, LPCTSTR lpTitle, const PFTBL* lpTable, UINT nCount
 				inirdargs16(szWork, p);
 				break;
 
-			case PFTYPE_ARGU32:
-				GetPrivateProfileString(lpTitle, p->item, str_null, szWork, _countof(szWork), lpPath);
-				inirdargu32(szWork, p);
-				break;
-
 			case PFTYPE_BYTE3:
 				GetPrivateProfileString(lpTitle, p->item, str_null, szWork, _countof(szWork), lpPath);
 				inirdbyte3(szWork, p);
@@ -406,10 +344,6 @@ void ini_write(LPCTSTR lpPath, LPCTSTR lpTitle, const PFTBL* lpTable, UINT nCoun
 
 				case PFTYPE_HEX32:
 					wsprintf(szWork, str_x, *(static_cast<const UINT32*>(p->value)));
-					break;
-
-				case PFTYPE_ARGU32:
-					iniwrargu32(szWork, p);
 					break;
 
 				default:
@@ -629,6 +563,7 @@ static const PFTBL s_IniItems[] =
 	PFMAX("volume_A", PFTYPE_UINT8,		&np2cfg.vol_adpcm,		128),
 	PFMAX("volume_P", PFTYPE_UINT8,		&np2cfg.vol_pcm,		128),
 	PFMAX("volume_R", PFTYPE_UINT8,		&np2cfg.vol_rhythm,		128),
+	PFMAX("volume_V", PFTYPE_UINT8,		&np2cfg.vol_midi,		128),
 
 	PFVAL("Seek_Snd", PFTYPE_BOOL,		&np2cfg.MOTOR),
 	PFMAX("Seek_Vol", PFTYPE_UINT8,		&np2cfg.MOTORVOL,		100),
@@ -669,13 +604,7 @@ static const PFTBL s_IniItems[] =
 	PFEXT("FDDRIVE2", PFRO_BITMAP,		&np2cfg.fddequip,		1),
 	PFEXT("FDDRIVE3", PFRO_BITMAP,		&np2cfg.fddequip,		2),
 	PFEXT("FDDRIVE4", PFRO_BITMAP,		&np2cfg.fddequip,		3),
-
-#if defined(SUPPORT_BMS)
-	PFEXT("Use_BMS_", PFTYPE_BOOL,		&bmsiocfg.enabled,		0),
-	PFEXT("BMS_Port", PFTYPE_HEX16,		&bmsiocfg.port,			0),
-	PFEXT("BMS_Size", PFTYPE_UINT8,		&bmsiocfg.numbanks,		0),
-#endif
-
+	
 #if defined(SUPPORT_NET)
 	PFSTR("NP2NETTAP", PFTYPE_STR,		np2cfg.np2nettap),
 	PFVAL("NP2NETPMM", PFTYPE_BOOL,		&np2cfg.np2netpmm),
@@ -738,7 +667,7 @@ static const PFTBL s_IniItems[] =
 	PFVAL("cpu_fecx", PFTYPE_HEX32,		&np2cfg.cpu_feature_ecx),
 	PFVAL("cpu_eflg", PFTYPE_HEX32,		&np2cfg.cpu_eflags_mask),
 
-	PFMAX("FPU_TYPE", PFTYPE_UINT8,		&np2cfg.fpu_type,		0), // FPU種類
+	PFVAL("FPU_TYPE", PFTYPE_UINT8,		&np2cfg.fpu_type), // FPU種類
 	
 #if defined(SUPPORT_FAST_MEMORYCHECK)
 	PFVAL("memckspd", PFTYPE_UINT8,		&np2cfg.memcheckspeed),
@@ -753,34 +682,18 @@ static const PFTBL s_IniItems[] =
 #if defined(SUPPORT_ASYNC_CPU)
 	PFVAL("ASYNCCPU", PFTYPE_BOOL,		&np2cfg.asynccpu), // 非同期CPUモード有効
 #endif
+	PFVAL("CONSTTSC", PFTYPE_BOOL,		&np2cfg.consttsc), // RDTSCをクロック変更によらず一定間隔にする
 #if defined(SUPPORT_IDEIO)
 	PFVAL("IDEBADDR", PFRO_HEX8,		&np2cfg.idebaddr), // IDE BIOS アドレス（デフォルト：D8h(D8000h)）
 #endif
 #if defined(SUPPORT_GAMEPORT)
 	PFVAL("GAMEPORT", PFTYPE_BOOL,		&np2cfg.gameport),
 #endif
+	PFVAL("USEMOVCS", PFRO_BOOL,		&np2cfg.allowMOVCS),
+	PFVAL("USETHOOK", PFRO_BOOL,		&np2cfg.usetexthook),
+	PFVAL("RASCSI92", PFRO_BOOL,		&np2cfg.rascsi92),
 
-#if defined(SUPPORT_VIDEOFILTER)
-		PFVAL("vf1_enable", PFTYPE_BOOL, &np2cfg.vf1_enable),
-		PFVAL("vf1_pcount", PFTYPE_UINT8, &np2cfg.vf1_pcount),
-		PFVAL("vf1_pno", PFTYPE_UINT8, &np2cfg.vf1_pno),
-		PFVAL("vf1_p0_fc", PFTYPE_UINT8, &np2cfg.vf1_profile[0][0]),
-		PFVAL("vf1_p0_fno", PFTYPE_UINT8, &np2cfg.vf1_profile[0][1]),
-		PFEXT("vf1_p0_p0", PFTYPE_ARGU32, np2cfg.vf1_param[0][0], 8),
-		PFEXT("vf1_p0_p1", PFTYPE_ARGU32, np2cfg.vf1_param[0][1], 8),
-		PFEXT("vf1_p0_p2", PFTYPE_ARGU32, np2cfg.vf1_param[0][2], 8),
-		PFVAL("vf1_p1_fc", PFTYPE_UINT8, &np2cfg.vf1_profile[1][0]),
-		PFVAL("vf1_p1_fno", PFTYPE_UINT8, &np2cfg.vf1_profile[1][1]),
-		PFEXT("vf1_p1_p0", PFTYPE_ARGU32, np2cfg.vf1_param[1][0], 8),
-		PFEXT("vf1_p1_p1", PFTYPE_ARGU32, np2cfg.vf1_param[1][1], 8),
-		PFEXT("vf1_p1_p2", PFTYPE_ARGU32, np2cfg.vf1_param[1][2], 8),
-		PFVAL("vf1_p2_fc", PFTYPE_UINT8, &np2cfg.vf1_profile[2][0]),
-		PFVAL("vf1_p2_fno", PFTYPE_UINT8, &np2cfg.vf1_profile[2][1]),
-		PFEXT("vf1_p2_p0", PFTYPE_ARGU32, np2cfg.vf1_param[2][0], 8),
-		PFEXT("vf1_p2_p1", PFTYPE_ARGU32, np2cfg.vf1_param[2][1], 8),
-		PFEXT("vf1_p2_p2", PFTYPE_ARGU32, np2cfg.vf1_param[2][2], 8),
-#endif
-
+	
 
 	// OS依存？
 	PFVAL("keyboard", PFRO_KB,			&np2oscfg.KEYBOARD),
@@ -788,14 +701,13 @@ static const PFTBL s_IniItems[] =
 	PFVAL("F12_COPY", PFTYPE_UINT8,		&np2oscfg.F12COPY),
 	PFVAL("Joystick", PFTYPE_BOOL,		&np2oscfg.JOYPAD1),
 	PFEXT("Joy1_btn", PFTYPE_BIN,		np2oscfg.JOY1BTN,		4),
+	PFMAX("Joy1_PID", PFTYPE_UINT8,		&np2oscfg.JOYPAD1ID,	15),
 
 	PFVAL("clocknow", PFTYPE_UINT8,		&np2oscfg.clk_x),
 	PFVAL("clockfnt", PFTYPE_UINT8,		&np2oscfg.clk_fnt),
 	PFAND("clock_up", PFRO_HEX32,		&np2oscfg.clk_color1,	0xffffff),
 	PFAND("clock_dn", PFRO_HEX32,		&np2oscfg.clk_color2,	0xffffff),
 
-	PFVAL("use_sstp", PFTYPE_BOOL,		&np2oscfg.sstp),
-	PFVAL("sstpport", PFTYPE_UINT16,	&np2oscfg.sstpport),
 	PFVAL("comfirm_", PFTYPE_BOOL,		&np2oscfg.comfirm),
 	PFVAL("shortcut", PFTYPE_HEX8,		&np2oscfg.shortcut),
 
@@ -819,6 +731,7 @@ static const PFTBL s_IniItems[] =
 	PFVAL("com1para", PFTYPE_UINT8,		&np2oscfg.com1.param),
 	PFVAL("com1_bps", PFTYPE_UINT32,	&np2oscfg.com1.speed),
 	PFVAL("com1fbps", PFTYPE_BOOL,		&np2oscfg.com1.fixedspeed),
+	PFVAL("com1dsrc", PFTYPE_BOOL,		&np2oscfg.com1.DSRcheck),
 	PFSTR("com1mmap", PFTYPE_STR,		np2oscfg.com1.mout),
 	PFSTR("com1mmdl", PFTYPE_STR,		np2oscfg.com1.mdl),
 	PFSTR("com1mdef", PFTYPE_STR,		np2oscfg.com1.def),
@@ -831,6 +744,7 @@ static const PFTBL s_IniItems[] =
 	PFVAL("com2para", PFTYPE_UINT8,		&np2oscfg.com2.param),
 	PFVAL("com2_bps", PFTYPE_UINT32,	&np2oscfg.com2.speed),
 	PFVAL("com2fbps", PFTYPE_BOOL,		&np2oscfg.com2.fixedspeed),
+	PFVAL("com2dsrc", PFTYPE_BOOL,		&np2oscfg.com2.DSRcheck),
 	PFSTR("com2mmap", PFTYPE_STR,		np2oscfg.com2.mout),
 	PFSTR("com2mmdl", PFTYPE_STR,		np2oscfg.com2.mdl),
 	PFSTR("com2mdef", PFTYPE_STR,		np2oscfg.com2.def),
@@ -843,6 +757,7 @@ static const PFTBL s_IniItems[] =
 	PFVAL("com3para", PFTYPE_UINT8,		&np2oscfg.com3.param),
 	PFVAL("com3_bps", PFTYPE_UINT32,	&np2oscfg.com3.speed),
 	PFVAL("com3fbps", PFTYPE_BOOL,		&np2oscfg.com3.fixedspeed),
+	PFVAL("com3dsrc", PFTYPE_BOOL,		&np2oscfg.com3.DSRcheck),
 	PFSTR("com3mmap", PFTYPE_STR,		np2oscfg.com3.mout),
 	PFSTR("com3mmdl", PFTYPE_STR,		np2oscfg.com3.mdl),
 	PFSTR("com3mdef", PFTYPE_STR,		np2oscfg.com3.def),
@@ -904,13 +819,18 @@ static const PFTBL s_IniItems[] =
 	PFVAL("CPUSTABF", PFTYPE_UINT16,	&np2oscfg.cpustabf), // クロック安定器適用限界時間（フレーム）
 	PFVAL("READONLY", PFRO_BOOL,		&np2oscfg.readonly), // 変更を設定ファイルに書き込まない
 	PFVAL("TICKMODE", PFRO_UINT8,		&np2oscfg.tickmode), // Tickカウンタのモードを強制的に設定する
-	PFVAL("USEWHEEL", PFRO_BOOL,		&np2oscfg.usewheel), // マウスホイールによる音量・マウス速度設定を使用する
-	PFVAL("USE_MVOL", PFRO_BOOL,		&np2oscfg.usemastervolume), // マスタボリューム設定を使用する
+	PFVAL("USEWHEEL", PFTYPE_BOOL,		&np2oscfg.usewheel), // マウスホイールによる音量・マウス速度設定を使用する
+	//PFVAL("USE_MVOL", PFRO_BOOL,		&np2oscfg.usemastervolume), // マスタボリューム設定を使用する
+	PFVAL("USEMIDIV", PFRO_BOOL,		&np2oscfg.usemidivolume), // MIDI疑似ボリューム設定を使用する
+	PFMAX("MVOL_MAX", PFRO_UINT8,		&np2oscfg.mastervolumemax, 255), // マスタボリュームの最大値を設定する
 	
 	PFVAL("TWNDHIST", PFRO_UINT8,		&np2oscfg.toolwndhistory), // ツールウィンドウのFDファイル履歴の記憶数
 	
 #if defined(SUPPORT_WACOM_TABLET)
 	PFVAL("PENTABFA", PFTYPE_BOOL,		&np2oscfg.pentabfa), // ペンタブレット アスペクト比固定モード
+#endif
+#if defined(SUPPORT_MULTITHREAD)
+	PFVAL("MTENABLE", PFRO_BOOL,		&np2oscfg.multithread), // マルチスレッドモード
 #endif
 };
 

@@ -65,11 +65,9 @@
 #if defined(SUPPORT_CL_GD5430)
 #include	<wab/cirrus_vga_extern.h>
 #endif
-#if defined(SUPPORT_HRTIMER)
-#include	<io/upd4990.h>
-#endif	/* SUPPORT_HRTIMER */
 #if defined(SUPPORT_IDEIO)
 #include	<cbus/ideio.h>
+#include	<cbus/atapicmd.h>
 #endif
 #if defined(SUPPORT_GPIB)
 #include	<cbus/gpibio.h>
@@ -101,7 +99,7 @@
 #include <time.h>
 
 
-const OEMCHAR np2version[] = OEMTEXT(NP2VER_CORE " " NP2VER_GIT);
+const OEMCHAR np2version[] = OEMTEXT(NP2KAI_GIT_TAG " " NP2KAI_GIT_HASH);
 
 #if defined(_WIN32_WCE)
 #define	PCBASEMULTIPLE	2
@@ -117,8 +115,9 @@ const OEMCHAR np2version[] = OEMTEXT(NP2VER_CORE " " NP2VER_GIT);
 				0, 0, {1, 1, 6, 1, 8, 1},
 				128, 0x00, 1, 
 #if defined(SUPPORT_ASYNC_CPU)
-				0,
+				0, 
 #endif
+				1,
 #if defined(SUPPORT_IDEIO)
 				0xD8,
 #endif
@@ -138,7 +137,7 @@ const OEMCHAR np2version[] = OEMTEXT(NP2VER_CORE " " NP2VER_GIT);
 #endif	/* SUPPORT_SOUND_SB16 */
 
 #if defined(SUPPORT_FMGEN)
-				3, {0x0c, 0x0c, 0x08, 0x06, 0x03, 0x0c}, 100, 64, 64, 64, 90, 64,
+				3, {0x0c, 0x0c, 0x08, 0x06, 0x03, 0x0c}, 100, 64, 64, 64, 64, 64, 128,
 #else	/* SUPPORT_FMGEN */
 				3, {0x0c, 0x0c, 0x08, 0x06, 0x03, 0x0c}, 100, 64, 64, 64, 64, 64,
 #endif	/* SUPPORT_FMGEN */
@@ -150,7 +149,7 @@ const OEMCHAR np2version[] = OEMTEXT(NP2VER_CORE " " NP2VER_GIT);
 #if defined(SUPPORT_FMGEN)
 				1,
 #endif	/* SUPPORT_FMGEN */
-				3, 0, 80, 0, 0, 1,
+				3, 0, 50, 0, 0, 1,
 
 				0, {OEMTEXT(""), OEMTEXT(""), OEMTEXT(""), OEMTEXT("")},
 #if defined(SUPPORT_IDEIO)
@@ -207,6 +206,9 @@ const OEMCHAR np2version[] = OEMTEXT(NP2VER_CORE " " NP2VER_GIT);
 #if defined(SUPPORT_GAMEPORT)
 				0,
 #endif
+				0,
+				0,
+				0,
 #if defined(SUPPORT_DEBUGSS)
 				0,
 #endif
@@ -219,6 +221,7 @@ const OEMCHAR np2version[] = OEMTEXT(NP2VER_CORE " " NP2VER_GIT);
 					{{1, 3, 8, 0, 0, 255, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0}},
 				},
 #endif
+				0, 500, 50,
 	};
 
 	PCCORE	pccore = {	PCBASECLOCK25, PCBASEMULTIPLE,
@@ -386,22 +389,22 @@ static void sound_init(void)
 	tms3631_initialize(rate);
 	tms3631_setvol(np2cfg.vol14);
 	opngen_initialize(rate);
-	opngen_setvol(np2cfg.vol_fm);
+	opngen_setvol(np2cfg.vol_fm * np2cfg.vol_master / 100);
 	psggen_initialize(rate);
-	psggen_setvol(np2cfg.vol_ssg);
+	psggen_setvol(np2cfg.vol_ssg * np2cfg.vol_master / 100);
 	rhythm_initialize(rate);
-	rhythm_setvol(np2cfg.vol_rhythm);
+	rhythm_setvol(np2cfg.vol_rhythm * np2cfg.vol_master / 100);
 	adpcm_initialize(rate);
-	adpcm_setvol(np2cfg.vol_adpcm);
+	adpcm_setvol(np2cfg.vol_adpcm * np2cfg.vol_master / 100);
 	pcm86gen_initialize(rate);
-	pcm86gen_setvol(np2cfg.vol_pcm);
+	pcm86gen_setvol(np2cfg.vol_pcm * np2cfg.vol_master / 100);
 	cs4231_initialize(rate);
 #ifdef SUPPORT_SOUND_SB16
 	ct1741_initialize(rate);
 #endif
 	amd98_initialize(rate);
 	oplgen_initialize(rate);
-	oplgen_setvol(np2cfg.vol_fm);
+	oplgen_setvol(np2cfg.vol_fm * np2cfg.vol_master / 100);
 }
 
 static void sound_term(void) {
@@ -456,6 +459,10 @@ void pccore_mem_free(void) {
 #endif
 	
 void pccore_init(void) {
+	
+#if defined(SUPPORT_MULTITHREAD)
+	nevent_initialize();
+#endif
 	
 #if defined(SUPPORT_IA32_HAXM)
 	i386hax_check();
@@ -534,10 +541,6 @@ void pccore_init(void) {
 	hostdrv_initialize();
 #endif
 
-#if defined(SUPPORT_HRTIMER)
-	upd4990_hrtimer_start();
-#endif	/* SUPPORT_HRTIMER */
-
 #if defined(SUPPORT_GPIB)
 	gpibio_initialize();
 #endif
@@ -548,10 +551,6 @@ void pccore_term(void) {
 #if defined(SUPPORT_GPIB)
 	gpibio_shutdown();
 #endif
-
-#if defined(SUPPORT_HRTIMER)
-	upd4990_hrtimer_stop();
-#endif	/* SUPPORT_HRTIMER */
 
 #if defined(SUPPORT_HOSTDRV)
 	hostdrv_deinitialize();
@@ -614,7 +613,10 @@ void pccore_term(void) {
 #if defined(SUPPORT_IA32_HAXM)
 	pccore_mem_free();
 #endif
-
+	
+#if defined(SUPPORT_MULTITHREAD)
+	nevent_shutdown();
+#endif
 }
 
 
@@ -795,6 +797,9 @@ void pccore_reset(void) {
 			CPU_EBX = 0;
 		}
 	}
+	
+	// mov cs,xx許可フラグ
+	i386cpuid.allow_movCS = np2cfg.allowMOVCS;
 
 	// FPU種類を設定
 	i386cpuid.fpu_type = np2cfg.fpu_type;
@@ -1022,34 +1027,48 @@ static void drawscreen(void) {
 				pcstat.screenupdate |= 1;
 			}
 		}
-		else if (gdcs.textdisp & GDCSCRN_ENABLE) {
-			if (!gdcs.disp) {
-				if ((gdcs.grphdisp & GDCSCRN_MAKE) ||
-					(gdcs.textdisp & GDCSCRN_MAKE)) {
-					if (!(gdc.mode1 & 0x4)) {
-						maketextgrph(0, gdcs.textdisp & GDCSCRN_ALLDRAW,
-								gdcs.grphdisp & GDCSCRN_ALLDRAW);
+		else {
+			if (gdcs.textdisp & GDCSCRN_ENABLE) {
+				if (!gdcs.disp) {
+					if ((gdcs.grphdisp & GDCSCRN_MAKE) ||
+						(gdcs.textdisp & GDCSCRN_MAKE)) {
+						if (!(gdc.mode1 & 0x4)) {
+							maketextgrph(0, gdcs.textdisp & GDCSCRN_ALLDRAW,
+									gdcs.grphdisp & GDCSCRN_ALLDRAW);
+						}
+						else {
+							maketextgrph40(0, gdcs.textdisp & GDCSCRN_ALLDRAW,
+									gdcs.grphdisp & GDCSCRN_ALLDRAW);
+						}
+						gdcs.grphdisp &= ~GDCSCRN_MAKE;
+						pcstat.screenupdate |= 1;
 					}
-					else {
-						maketextgrph40(0, gdcs.textdisp & GDCSCRN_ALLDRAW,
-								gdcs.grphdisp & GDCSCRN_ALLDRAW);
-					}
-					gdcs.grphdisp &= ~GDCSCRN_MAKE;
-					pcstat.screenupdate |= 1;
 				}
-			}
-			else {
-				if ((gdcs.grphdisp & (GDCSCRN_MAKE << 1)) ||
-					(gdcs.textdisp & GDCSCRN_MAKE)) {
-					if (!(gdc.mode1 & 0x4)) {
-						maketextgrph(1, gdcs.textdisp & GDCSCRN_ALLDRAW,
-								gdcs.grphdisp & (GDCSCRN_ALLDRAW << 1));
+				else {
+					if ((gdcs.grphdisp & (GDCSCRN_MAKE << 1)) ||
+						(gdcs.textdisp & GDCSCRN_MAKE)) {
+						if (!(gdc.mode1 & 0x4)) {
+							maketextgrph(1, gdcs.textdisp & GDCSCRN_ALLDRAW,
+									gdcs.grphdisp & (GDCSCRN_ALLDRAW << 1));
+						}
+						else {
+							maketextgrph40(1, gdcs.textdisp & GDCSCRN_ALLDRAW,
+									gdcs.grphdisp & (GDCSCRN_ALLDRAW << 1));
+						}
+						gdcs.grphdisp &= ~(GDCSCRN_MAKE << 1);
+						pcstat.screenupdate |= 1;
 					}
-					else {
-						maketextgrph40(1, gdcs.textdisp & GDCSCRN_ALLDRAW,
-								gdcs.grphdisp & (GDCSCRN_ALLDRAW << 1));
-					}
-					gdcs.grphdisp &= ~(GDCSCRN_MAKE << 1);
+				}
+			}else{
+				// 白黒グラフィック
+				grphfn = makegrph;
+				bit = GDCSCRN_MAKE;
+				if (gdcs.disp) {
+					bit <<= 1;
+				}
+				if (gdcs.grphdisp & bit) {
+					(*grphfn)(gdcs.disp, gdcs.grphdisp & bit & GDCSCRN_ALLDRAW2);
+					gdcs.grphdisp &= ~bit;
 					pcstat.screenupdate |= 1;
 				}
 			}
@@ -1138,8 +1157,10 @@ void pccore_postevent(UINT32 event) {	// yet!
 
 void pccore_exec(BOOL draw) {
 
-	static UINT32 disptmr = 0;
+	// ここでローカル変数を使うとsetjmp周りの最適化で破壊される可能性があるので注意
 	static UINT32 baseclk = 0;
+	//UINT32 lastclock;
+	//UINT32 mflag = 0;
 
 	pcstat.drawframe = (UINT8)draw;
 //	keystat_sync();
@@ -1163,6 +1184,10 @@ void pccore_exec(BOOL draw) {
 	nevent_set(NEVENT_FLAMES, gdc.dispclock, screenvsync, NEVENT_RELATIVE);
 
 //	nevent_get1stevent();
+
+	if(np2cfg.keyrepeat_enable) {
+		keyrepeat_proc();
+	}
 	
 	while(pcstat.screendispflag) {
 #if defined(TRACE)
@@ -1185,6 +1210,7 @@ void pccore_exec(BOOL draw) {
 #endif
 #if defined(SUPPORT_CL_GD5430)
 			np2clvga.gd54xxtype = np2clvga.defgd54xxtype; // Auto Select用
+			pc98_cirrus_vga_initVRAMWindowAddr();
 			pc98_cirrus_vga_resetresolution();
 #endif
 #if defined(SUPPORT_IDEIO)
@@ -1237,8 +1263,13 @@ void pccore_exec(BOOL draw) {
 		CPU_MSR_TSC = CPU_MSR_TSC - baseclk + CPU_BASECLOCK * pccore.maxmultiple / pccore.multiple;
 #endif
 #if defined(SUPPORT_HRTIMER)
-	upd4990_hrtimer_count();
-#endif	/* SUPPORT_HRTIMER */
+		upd4990_hrtimer_count();
+#endif
+#if defined(SUPPORT_IDEIO)
+#if !defined(NP2_X) && !defined(NP2_SDL) && !defined(__LIBRETRO__)
+	atapi_dataread_asyncwait(INFINITE);
+#endif
+#endif
 		nevent_progress();
 	}
 #if defined(SUPPORT_ASYNC_CPU)
@@ -1259,6 +1290,9 @@ void pccore_exec(BOOL draw) {
 	if (pcstat.hardwarereset) {
 		pcstat.hardwarereset = FALSE;
 		pccore_cfgupdate();
+		if(nevent_iswork(NEVENT_CDWAIT)){
+			nevent_forceexecute(NEVENT_CDWAIT);
+		}
 		pccore_reset();
 	}
 

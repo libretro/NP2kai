@@ -7,22 +7,40 @@
 #include <soundmng.h>
 #include <np2.h>
 #if defined(SUPPORT_ROMEO)
-#include "ext\externalchipmanager.h"
+#include "ext/externalchipmanager.h"
 #endif
 #if defined(MT32SOUND_DLL)
-#include "ext\mt32snd.h"
+#include "ext/mt32snd.h"
 #endif
 #if defined(SUPPORT_ASIO)
-#include "soundmng\sdasio.h"
+#include "soundmng/sdasio.h"
 #endif	// defined(SUPPORT_ASIO)
-#include "soundmng\sddsound3.h"
+#include "soundmng/sddsound3.h"
 #if defined(SUPPORT_WASAPI)
-#include "soundmng\sdwasapi.h"
+#include "soundmng/sdwasapi.h"
 #endif	// defined(SUPPORT_WASAPI)
-#include "common\parts.h"
-#include "sound\sound.h"
+#include "common/parts.h"
+#include "sound/sound.h"
 #if defined(VERMOUTH_LIB)
-#include "sound\vermouth\vermouth.h"
+#include "sound/vermouth/vermouth.h"
+#endif
+#include	<np2mt.h>
+
+#if !defined(_WIN64)
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+/**
+ * satuation
+ * @param[out] dst 出力バッファ
+ * @param[in] src 入力バッファ
+ * @param[in] size サイズ
+ */
+void __fastcall satuation_s16mmx(SINT16 *dst, const SINT32 *src, UINT size);
+#ifdef __cplusplus
+}
+#endif
 #endif
 
 #if defined(VERMOUTH_LIB)
@@ -41,7 +59,7 @@ void CSoundMng::Initialize()
 	::CoInitializeEx(NULL, COINIT_MULTITHREADED);
 #endif	// defined(SUPPORT_ASIO) || defined(SUPPORT_WASAPI)
 
-	CSoundDeviceDSound3::s_mastervol_available = np2oscfg.usemastervolume ? true : false;
+	CSoundDeviceDSound3::s_mastervol_available = true;//np2oscfg.usemastervolume ? true : false;
 	CSoundDeviceDSound3::Initialize();
 #if defined(SUPPORT_WASAPI)
 	CSoundDeviceWasapi::Initialize();
@@ -54,6 +72,8 @@ void CSoundMng::Initialize()
 #if defined(SUPPORT_ROMEO)
 	CExternalChipManager::GetInstance()->Initialize();
 #endif	// defined(SUPPORT_ROMEO)
+
+	CSoundMng::GetInstance()->InitializeSoundCriticalSection();
 }
 
 /**
@@ -72,6 +92,8 @@ void CSoundMng::Deinitialize()
 #if defined(SUPPORT_ASIO) || defined(SUPPORT_WASAPI)
 	::CoUninitialize();
 #endif	// defined(SUPPORT_ASIO) || defined(SUPPORT_WASAPI)
+	
+	CSoundMng::GetInstance()->FinalizeSoundCriticalSection();
 }
 
 /**
@@ -80,6 +102,7 @@ void CSoundMng::Deinitialize()
 CSoundMng::CSoundMng()
 	: m_pSoundDevice(NULL)
 	, m_nMute(0)
+	, m_sound_cs_initialized(false)
 {
 	SetReverse(false);
 }
@@ -94,6 +117,8 @@ CSoundMng::CSoundMng()
  */
 bool CSoundMng::Open(DeviceType nType, LPCTSTR lpName, HWND hWnd)
 {
+	EnterAllCriticalSection();
+
 	Close();
 
 	CSoundDeviceBase* pSoundDevice = NULL;
@@ -132,6 +157,7 @@ bool CSoundMng::Open(DeviceType nType, LPCTSTR lpName, HWND hWnd)
 
 	if (pSoundDevice == NULL)
 	{
+		LeaveSoundCriticalSection();
 		return false;
 	}
 
@@ -141,6 +167,7 @@ bool CSoundMng::Open(DeviceType nType, LPCTSTR lpName, HWND hWnd)
 	MT32Sound::GetInstance()->Initialize();
 #endif
 	
+	LeaveAllCriticalSection();
 	return true;
 }
 
@@ -149,6 +176,7 @@ bool CSoundMng::Open(DeviceType nType, LPCTSTR lpName, HWND hWnd)
  */
 void CSoundMng::Close()
 {
+	EnterAllCriticalSection();
 	if (m_pSoundDevice)
 	{
 		m_pSoundDevice->Close();
@@ -159,6 +187,7 @@ void CSoundMng::Close()
 #if defined(MT32SOUND_DLL)
 	MT32Sound::GetInstance()->Deinitialize();
 #endif
+	LeaveAllCriticalSection();
 }
 
 /**
@@ -167,9 +196,11 @@ void CSoundMng::Close()
  */
 void CSoundMng::Enable(SoundProc nProc)
 {
+	EnterSoundCriticalSection();
 	const UINT nBit = 1 << nProc;
 	if (!(m_nMute & nBit))
 	{
+		LeaveSoundCriticalSection();
 		return;
 	}
 	m_nMute &= ~nBit;
@@ -183,6 +214,7 @@ void CSoundMng::Enable(SoundProc nProc)
 		CExternalChipManager::GetInstance()->Mute(false);
 #endif	// defined(SUPPORT_ROMEO)
 	}
+	LeaveSoundCriticalSection();
 }
 
 /**
@@ -191,6 +223,7 @@ void CSoundMng::Enable(SoundProc nProc)
  */
 void CSoundMng::Disable(SoundProc nProc)
 {
+	EnterSoundCriticalSection();
 	if (!m_nMute)
 	{
 		if (m_pSoundDevice)
@@ -203,6 +236,7 @@ void CSoundMng::Disable(SoundProc nProc)
 #endif	// defined(SUPPORT_ROMEO)
 	}
 	m_nMute |= (1 << nProc);
+	LeaveSoundCriticalSection();
 }
 
 /**
@@ -213,8 +247,10 @@ void CSoundMng::Disable(SoundProc nProc)
  */
 UINT CSoundMng::CreateStream(UINT nSamplingRate, UINT ms)
 {
+	EnterAllCriticalSection();
 	if (m_pSoundDevice == NULL)
 	{
+		LeaveSoundCriticalSection();
 		return 0;
 	}
 
@@ -232,6 +268,7 @@ UINT CSoundMng::CreateStream(UINT nSamplingRate, UINT ms)
 	nBuffer = m_pSoundDevice->CreateStream(nSamplingRate, 2, nBuffer);
 	if (nBuffer == 0)
 	{
+		LeaveSoundCriticalSection();
 		return 0;
 	}
 	m_pSoundDevice->SetStreamData(this);
@@ -245,6 +282,7 @@ UINT CSoundMng::CreateStream(UINT nSamplingRate, UINT ms)
 	MT32Sound::GetInstance()->SetRate(nSamplingRate);
 #endif
 
+	LeaveAllCriticalSection();
 	return nBuffer;
 }
 
@@ -272,10 +310,12 @@ inline void CSoundMng::DestroyStream()
  */
 inline void CSoundMng::ResetStream()
 {
+	EnterSoundCriticalSection();
 	if (m_pSoundDevice)
 	{
 		m_pSoundDevice->ResetStream();
 	}
+	LeaveSoundCriticalSection();
 }
 
 /**
@@ -283,6 +323,7 @@ inline void CSoundMng::ResetStream()
  */
 inline void CSoundMng::PlayStream()
 {
+	EnterSoundCriticalSection();
 	if (!m_nMute)
 	{
 		if (m_pSoundDevice)
@@ -290,6 +331,7 @@ inline void CSoundMng::PlayStream()
 			m_pSoundDevice->PlayStream();
 		}
 	}
+	LeaveSoundCriticalSection();
 }
 
 /**
@@ -297,6 +339,7 @@ inline void CSoundMng::PlayStream()
  */
 inline void CSoundMng::StopStream()
 {
+	EnterSoundCriticalSection();
 	if (!m_nMute)
 	{
 		if (m_pSoundDevice)
@@ -304,6 +347,7 @@ inline void CSoundMng::StopStream()
 			m_pSoundDevice->StopStream();
 		}
 	}
+	LeaveSoundCriticalSection();
 }
 
 /**
@@ -314,15 +358,18 @@ inline void CSoundMng::StopStream()
  */
 UINT CSoundMng::Get16(SINT16* lpBuffer, UINT nBufferCount)
 {
+	EnterSoundCriticalSection();
 	const SINT32* lpSource = ::sound_pcmlock();
 	if (lpSource)
 	{
 		(*m_fnMix)(lpBuffer, lpSource, nBufferCount * 4);
 		::sound_pcmunlock(lpSource);
+		LeaveSoundCriticalSection();
 		return nBufferCount;
 	}
 	else
 	{
+		LeaveSoundCriticalSection();
 		return 0;
 	}
 }
@@ -333,14 +380,26 @@ UINT CSoundMng::Get16(SINT16* lpBuffer, UINT nBufferCount)
  */
 inline void CSoundMng::SetReverse(bool bReverse)
 {
+	EnterSoundCriticalSection();
 	if (!bReverse)
 	{
+#if !defined(_WIN64)
+		if (mmxflag)
+		{
+			m_fnMix = satuation_s16;
+		}
+		else {
+			m_fnMix = satuation_s16mmx;
+		}
+#else
 		m_fnMix = satuation_s16;
+#endif
 	}
 	else
 	{
 		m_fnMix = satuation_s16x;
 	}
+	LeaveSoundCriticalSection();
 }
 
 /**
@@ -349,10 +408,12 @@ inline void CSoundMng::SetReverse(bool bReverse)
  */
 void CSoundMng::SetMasterVolume(int nVolume)
 {
+	EnterSoundCriticalSection();
 	if (m_pSoundDevice)
 	{
 		m_pSoundDevice->SetMasterVolume(nVolume);
 	}
+	LeaveSoundCriticalSection();
 }
 
 /**
@@ -362,10 +423,27 @@ void CSoundMng::SetMasterVolume(int nVolume)
  */
 void CSoundMng::LoadPCM(SoundPCMNumber nNum, LPCTSTR lpFilename)
 {
+	EnterSoundCriticalSection();
 	if (m_pSoundDevice)
 	{
 		m_pSoundDevice->LoadPCM(nNum, lpFilename);
 	}
+	LeaveSoundCriticalSection();
+}
+
+/**
+ * PCM データ再読み込み
+ * @param[in] nNum PCM 番号
+ * @param[in] lpFilename ファイル名
+ */
+void CSoundMng::ReloadPCM(SoundPCMNumber nNum)
+{
+	EnterSoundCriticalSection();
+	if (m_pSoundDevice)
+	{
+		m_pSoundDevice->ReloadPCM(nNum);
+	}
+	LeaveSoundCriticalSection();
 }
 
 /**
@@ -375,10 +453,12 @@ void CSoundMng::LoadPCM(SoundPCMNumber nNum, LPCTSTR lpFilename)
  */
 void CSoundMng::SetPCMVolume(SoundPCMNumber nNum, int nVolume)
 {
+	EnterSoundCriticalSection();
 	if (m_pSoundDevice)
 	{
 		m_pSoundDevice->SetPCMVolume(nNum, nVolume);
 	}
+	LeaveSoundCriticalSection();
 }
 
 /**
@@ -390,13 +470,16 @@ void CSoundMng::SetPCMVolume(SoundPCMNumber nNum, int nVolume)
  */
 inline bool CSoundMng::PlayPCM(SoundPCMNumber nNum, BOOL bLoop)
 {
+	EnterSoundCriticalSection();
 	if (!m_nMute)
 	{
 		if (m_pSoundDevice)
 		{
+			LeaveSoundCriticalSection();
 			return m_pSoundDevice->PlayPCM(nNum, bLoop);
 		}
 	}
+	LeaveSoundCriticalSection();
 	return false;
 }
 
@@ -406,10 +489,50 @@ inline bool CSoundMng::PlayPCM(SoundPCMNumber nNum, BOOL bLoop)
  */
 inline void CSoundMng::StopPCM(SoundPCMNumber nNum)
 {
+	EnterSoundCriticalSection();
 	if (m_pSoundDevice)
 	{
 		m_pSoundDevice->StopPCM(nNum);
 	}
+	LeaveSoundCriticalSection();
+}
+
+// クリティカルセクション関連
+void CSoundMng::InitializeSoundCriticalSection()
+{
+	if(!m_sound_cs_initialized){
+		InitializeCriticalSection(&m_sound_cs);
+		m_sound_cs_initialized = true;
+	}
+}
+void CSoundMng::FinalizeSoundCriticalSection()
+{
+	if(m_sound_cs_initialized){
+		DeleteCriticalSection(&m_sound_cs);
+		m_sound_cs_initialized = false;
+	}
+}
+void CSoundMng::EnterSoundCriticalSection()
+{
+	if(m_sound_cs_initialized){
+		EnterCriticalSection(&m_sound_cs);
+	}
+}
+void CSoundMng::LeaveSoundCriticalSection()
+{
+	if(m_sound_cs_initialized){
+		LeaveCriticalSection(&m_sound_cs);
+	}
+}
+void CSoundMng::EnterAllCriticalSection()
+{
+	np2_multithread_EnterCriticalSection();
+	EnterSoundCriticalSection();
+}
+void CSoundMng::LeaveAllCriticalSection()
+{
+	LeaveSoundCriticalSection();
+	np2_multithread_LeaveCriticalSection();
 }
 
 // ---- C ラッパー
@@ -422,7 +545,9 @@ inline void CSoundMng::StopPCM(SoundPCMNumber nNum)
  */
 UINT soundmng_create(UINT rate, UINT ms)
 {
-	return CSoundMng::GetInstance()->CreateStream(rate, ms);
+	UINT result;
+	result = CSoundMng::GetInstance()->CreateStream(rate, ms);
+	return result;
 }
 
 /**
@@ -484,7 +609,9 @@ void soundmng_setvolume(int nVolume)
  */
 BRESULT soundmng_pcmplay(enum SoundPCMNumber nNum, BOOL bLoop)
 {
-	return (CSoundMng::GetInstance()->PlayPCM(nNum, bLoop)) ? SUCCESS : FAILURE;
+	BRESULT result;
+	result = (CSoundMng::GetInstance()->PlayPCM(nNum, bLoop)) ? SUCCESS : FAILURE;
+	return result;
 }
 
 /**

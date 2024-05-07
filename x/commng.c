@@ -36,6 +36,24 @@ ncwriteretry(COMMNG self)
 	return 1;
 }
 
+static void
+ncbeginblocktranster(COMMNG self)
+{
+
+	(void)self;
+
+	return;
+}
+
+static void
+ncendblocktranster(COMMNG self)
+{
+
+	(void)self;
+
+	return;
+}
+
 static UINT
 nclastwritesuccess(COMMNG self)
 {
@@ -76,6 +94,7 @@ ncrelease(COMMNG self)
 }
 
 static _COMMNG com_nc = {
+//	COMCONNECT_OFF, ncread, ncwrite, ncwriteretry, ncbeginblocktranster, ncendblocktranster, nclastwritesuccess, ncgetstat, ncmsg, ncrelease
 	COMCONNECT_OFF, ncread, ncwrite, ncwriteretry, nclastwritesuccess, ncgetstat, ncmsg, ncrelease
 };
 
@@ -90,7 +109,7 @@ commng_initialize(void)
 }
 
 COMMNG
-commng_create(UINT device)
+commng_create(UINT device, BOOL onReset)
 {
 	COMMNG ret;
 	COMCFG *cfg;
@@ -138,8 +157,10 @@ commng_create(UINT device)
 	if (cfg) {
 		if ((cfg->port >= COMPORT_COM1)
 		 && (cfg->port <= COMPORT_COM4)) {
+			if(onReset) return NULL;
 			ret = cmserial_create(cfg->port - COMPORT_COM1 + 1, cfg->param, cfg->speed);
 		} else if (cfg->port == COMPORT_MIDI) {
+			if(onReset) return NULL;
 			ret = cmmidi_create(device, cfg->mout, cfg->min, cfg->mdl);
 			if (ret) {
 				(*ret->msg)(ret, COMMSG_MIMPIDEFFILE, (INTPTR)cfg->def);

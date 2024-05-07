@@ -38,6 +38,17 @@ typedef struct {
 	DSP_INFO dsp_info;
 } SB16;
 
+typedef struct { // ステートセーブ互換性維持用（変更禁止）
+	UINT8	dmairq;
+	UINT8	dmach;
+	UINT16	base;
+	UINT8	mixsel;
+	UINT8	mixreg[0x100];
+	UINT32	mixregexp[0x100];
+
+	DSP_INFO_OLD dsp_info;
+} SB16_OLD;
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -54,6 +65,8 @@ extern	_CS4231		cs4231;
 extern	SB16		g_sb16;
 
 REG8 fmboard_getjoy(POPNA opna);
+
+void fmboard_updatevolume(void);
 
 void fmboard_extreg(void (*ext)(REG8 enable));
 void fmboard_extenable(REG8 enable);
