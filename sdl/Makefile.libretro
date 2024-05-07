@@ -14,10 +14,10 @@ else
 GIT_HASH := $(shell git rev-parse --short HEAD)
 endif
 ifeq ($(GIT_TAG),)
-$(error Need Git to build NP2kai.)
+GIT_TAG := rev.22
 endif
 ifeq ($(GIT_HASH),)
-$(error Need Git to build NP2kai.)
+GIT_TAG := 40eed6a
 endif
 
 C_VER = -std=gnu99
