@@ -32,7 +32,7 @@ enum {
 };
 
 typedef struct {
-	char	item[12];
+	char	item[32];
 	UINT16	itemtype;
 	void	*value;
 	UINT32	arg;
@@ -43,6 +43,8 @@ void ini_write(const char *path, const char *title, INITBL *tbl, UINT count, BOO
 
 void initload(void);
 void initsave(void);
+
+void initgetfile(OEMCHAR *lpPath, unsigned int cchPath);
 
 G_END_DECLS
 

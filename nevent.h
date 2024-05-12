@@ -56,8 +56,9 @@ enum tagNEventId
 #if defined(SUPPORT_WAB)
 	NEVENT_WABSNDOFF	= 33,
 #endif
+	NEVENT_HRTIMER		= 34,
 	/* ---- */
-	NEVENT_MAXEVENTS	= 34
+	NEVENT_MAXEVENTS	= 35
 };
 typedef enum tagNEventId NEVENTID;
 
@@ -106,6 +107,13 @@ extern "C" {
 
 extern	_NEVENT		g_nevent;
 
+#if defined(SUPPORT_MULTITHREAD)
+// 全体の初期化処理
+void nevent_initialize(void);
+// 全体の解放処理
+void nevent_shutdown(void);
+#endif
+
 // 初期化
 void nevent_allreset(void);
 
@@ -128,6 +136,9 @@ void nevent_waitreset(NEVENTID id);
 
 // イベントの動作状態取得
 BOOL nevent_iswork(NEVENTID id);
+
+// イベントコールバックの強制実行（注:既存の待ちイベントの無効化は行われない）
+void nevent_forceexecute(NEVENTID id);
 
 // イベント実行までのクロック数の取得
 SINT32 nevent_getremain(NEVENTID id);

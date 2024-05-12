@@ -211,11 +211,14 @@ void keystat_resendstat(void);
 REG8 keystat_getjoy(void);
 REG8 keystat_getmouse(SINT16 *x, SINT16 *y);
 
-
+// keyrepeat
+// keyrepeat interval processing
+void keyrepeat_proc();
 
 // ---- 廃止関数
 
 void keystat_senddata(REG8 data);
+void keystat_senddataraw(REG8 data);
 void keystat_forcerelease(REG8 data);
 
 #ifdef __cplusplus

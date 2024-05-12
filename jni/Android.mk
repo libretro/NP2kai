@@ -126,8 +126,24 @@ ifeq ($(SUPPORT_DIRENT), 1)
 	SOURCES_C += $(NP2_PATH)/sdl/libretro/libretro-common/vfs/vfs_implementation.c
 endif
 
+# Nixpkgs has not Git. Need version and hash is given by env variants.
+ifneq ($(NP2KAI_VERSION),)
+GIT_TAG := $(NP2KAI_VERSION)
+else
 GIT_TAG := "$(shell git describe --tags --abbrev=0)"
+endif
+ifneq ($(NP2KAI_HASH),)
+GIT_HASH := $(NP2KAI_HASH)
+else
 GIT_HASH := "$(shell git rev-parse --short HEAD)"
+endif
+ifeq ($(GIT_TAG),)
+$(error Need Git to build NP2kai.)
+endif
+ifeq ($(GIT_HASH),)
+$(error Need Git to build NP2kai.)
+endif
+
 ifneq ($(GIT_VERSION)," unknown")
 	COREFLAGS += -DNP2KAI_GIT_TAG=\"$(GIT_TAG)\" -DNP2KAI_GIT_HASH=\"$(GIT_HASH)\"
 endif

@@ -50,6 +50,41 @@ struct retro_core_option_definition option_defs_us[] = {
       "Ja"
    },
    {
+      "np2kai_keyrepeat",
+      "Key-repeat",
+      "Continue press key, key-repeat.",
+      {
+         { "OFF", NULL },
+         { "ON", NULL },
+         { NULL, NULL},
+      },
+      "OFF"
+   },
+   {
+      "np2kai_keyrepeat_delay",
+      "Key-repeat delay",
+      "Key-repeat start after delay.",
+      {
+         { "250ms", NULL },
+         { "500ms", NULL },
+         { "1000ms", NULL },
+         { NULL, NULL},
+      },
+      "500ms"
+   },
+   {
+      "np2kai_keyrepeat_interval",
+      "Key-repeat interval",
+      "Key-repeat interval.",
+      {
+         { "25ms", NULL },
+         { "50ms", NULL },
+         { "100ms", NULL },
+         { NULL, NULL},
+      },
+      "50ms"
+   },
+   {
       "np2kai_model",
       "PC Model (Restart)",
       NULL,
@@ -235,7 +270,7 @@ struct retro_core_option_definition option_defs_us[] = {
    },
    {
       "np2kai_lcd",
-      "LCD",
+      "LCD (old monochrome)",
       NULL,
       {
          { "OFF", NULL },
@@ -844,6 +879,7 @@ struct retro_core_option_definition option_defs_us[] = {
       {"Keypad 3button", NULL},
       {"Manual Keyboard", NULL},
       {"Atari Joypad", NULL},
+      {"Keypad Fighting", NULL},
       {NULL, NULL},
     },
     "OFF"
@@ -886,6 +922,41 @@ struct retro_core_option_definition option_defs_ja[] = {
          { NULL, NULL},
       },
       "FDD2"
+   },
+   {
+      "np2kai_keyrepeat",
+      "キーリピート",
+      "キーを押し続けると、リピート入力します。",
+      {
+         { "OFF", NULL },
+         { "ON", NULL },
+         { NULL, NULL},
+      },
+      "OFF"
+   },
+   {
+      "np2kai_keyrepeat_delay",
+      "キーリピート 開始遅延",
+      "キーリピート開始するまでの遅延時間。",
+      {
+         { "250ms", NULL },
+         { "500ms", NULL },
+         { "1000ms", NULL },
+         { NULL, NULL},
+      },
+      "500ms"
+   },
+   {
+      "np2kai_keyrepeat_interval",
+      "キーリピート 間隔",
+      "キーリピートの入力間隔。",
+      {
+         { "25ms", NULL },
+         { "50ms", NULL },
+         { "100ms", NULL },
+         { NULL, NULL},
+      },
+      "50ms"
    },
    {
       "np2kai_keyboard",
@@ -1084,7 +1155,7 @@ struct retro_core_option_definition option_defs_ja[] = {
    },
    {
       "np2kai_lcd",
-      "液晶ディスプレイ",
+      "(古いモノクロ)液晶ディスプレイ",
       NULL,
       {
          { "OFF", NULL },
@@ -1693,6 +1764,7 @@ struct retro_core_option_definition option_defs_ja[] = {
       {"Keypad 3button", NULL},
       {"Manual Keyboard", NULL},
       {"Atari Joypad", NULL},
+      {"Keypad Fighting", NULL},
       {NULL, NULL},
     },
     "OFF"

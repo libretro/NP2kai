@@ -87,10 +87,10 @@ static const LRKCNV lrcnv101[] = {
   {RETROK_PERIOD,       0x31},  // . >
   {RETROK_SLASH,        0x32},  // / ?
   // _ _
-  {RETROK_RSHIFT,       0x75},  // RShift
+  {RETROK_RSHIFT,       0x7d},  // RShift
   // Kana
-  {RETROK_LSUPER,       0x70},  // LSuper
-  {RETROK_RCTRL,        0x33},  // GRPH
+  {RETROK_LSUPER,       0x77},  // LSuper
+  {RETROK_RCTRL,        0x73},  // GRPH
   {RETROK_LALT,         0x51},  // NFER
   {RETROK_SPACE,        0x34},  // Space
   {RETROK_RALT,         0x35},  // XFER
@@ -197,10 +197,10 @@ static const LRKCNV lrcnv106[] = {
   {RETROK_PERIOD,       0x31},  // . >
   {RETROK_SLASH,        0x32},  // / ?
   {2,      0x33},       // _ _ (L2?menu open?)
-  {RETROK_RSHIFT,       0x75},  // RShift
+  {RETROK_RSHIFT,       0x7d},  // RShift
   // Kana
-  {RETROK_LSUPER,       0x70},  // LSuper
-  {RETROK_RCTRL,        0x33},  // GRPH
+  {RETROK_LSUPER,       0x77},  // LSuper
+  {RETROK_RCTRL,        0x73},  // GRPH
   {RETROK_LALT,         0x51},  // NFER
   {RETROK_SPACE,        0x34},  // Space
   {RETROK_RALT,         0x35},  // XFER
@@ -391,10 +391,10 @@ static const SDLKCNV sdlcnv101[] = {
   {SDLK_PERIOD,       0x31},  // . >
   {SDLK_SLASH,        0x32},  // / ?
   // _ _
-  {SDLK_RSHIFT,       0x75},  // RShift
+  {SDLK_RSHIFT,       0x7d},  // RShift
   // Kana
-  {SDLK_LSUPER,       0x70},  // LSuper (M)
-  {SDLK_RCTRL,        0x33},  // GRPH
+  {SDLK_LSUPER,       0x77},  // LSuper (M)
+  {SDLK_RCTRL,        0x73},  // GRPH
   {SDLK_LALT,         0x51},  // NFER
   {SDLK_SPACE,        0x34},  // Space
   {SDLK_RALT,         0x35},  // XFER
@@ -498,10 +498,10 @@ static const SDLKCNV sdlcnv101[] = {
   {SDL_SCANCODE_PERIOD,       0x31},  // . >
   {SDL_SCANCODE_SLASH,        0x32},  // / ?
   // _ _
-  {SDL_SCANCODE_RSHIFT,       0x75},  // RShift
+  {SDL_SCANCODE_RSHIFT,       0x7d},  // RShift
   // Kana
-  {SDL_SCANCODE_LGUI,         0x70},  // LSuper (M)
-  {SDL_SCANCODE_RCTRL,        0x33},  // GRPH
+  {SDL_SCANCODE_LGUI,         0x77},  // LSuper (M)
+  {SDL_SCANCODE_RCTRL,        0x73},  // GRPH
   {SDL_SCANCODE_LALT,         0x51},  // NFER
   {SDL_SCANCODE_SPACE,        0x34},  // Space
   {SDL_SCANCODE_RALT,         0x35},  // XFER
@@ -609,10 +609,10 @@ static const SDLKCNV sdlcnv106[] = {
   {SDLK_PERIOD,       0x31},  // . >
   {SDLK_SLASH,        0x32},  // / ?
   // _ _
-  {SDLK_RSHIFT,       0x75},  // RShift
+  {SDLK_RSHIFT,       0x7d},  // RShift
   // Kana
-  {SDLK_LSUPER,       0x70},  // LSuper (M)
-  {SDLK_RCTRL,        0x33},  // GRPH
+  {SDLK_LSUPER,       0x77},  // LSuper (M)
+  {SDLK_RCTRL,        0x73},  // GRPH
   {SDLK_LALT,         0x51},  // NFER
   {SDLK_SPACE,        0x34},  // Space
   {SDLK_RALT,         0x35},  // XFER
@@ -716,10 +716,10 @@ static const SDLKCNV sdlcnv106[] = {
   {SDL_SCANCODE_PERIOD,         0x31},  // . >
   {SDL_SCANCODE_SLASH,          0x32},  // / ?
   {SDL_SCANCODE_INTERNATIONAL1, 0x33},  // _ _
-  {SDL_SCANCODE_RSHIFT,         0x75},  // RShift
+  {SDL_SCANCODE_RSHIFT,         0x7d},  // RShift
   // Kana
-  {SDL_SCANCODE_LGUI,           0x70},  // LSuper (M)
-  {SDL_SCANCODE_RCTRL,          0x33},  // GRPH
+  {SDL_SCANCODE_LGUI,           0x77},  // LSuper (M)
+  {SDL_SCANCODE_RCTRL,          0x73},  // GRPH
   {SDL_SCANCODE_LALT,           0x51},  // NFER
   {SDL_SCANCODE_SPACE,          0x34},  // Space
   {SDL_SCANCODE_RALT,           0x35},  // XFER
@@ -773,15 +773,15 @@ static UINT8 getKey(SDL_Scancode key) {
   if(np2oscfg.xrollkey) {
 #if SDL_MAJOR_VERSION == 1
     if(key == SDLK_PAGEUP) {
-      return key = SDLK_PAGEDOWN;
+      key = SDLK_PAGEDOWN;
     } else if(key == SDLK_PAGEDOWN) {
-      return key = SDLK_PAGEUP;
+      key = SDLK_PAGEUP;
     }
 #else
     if(key == SDL_SCANCODE_PAGEUP) {
-      return key = SDL_SCANCODE_PAGEDOWN;
+      key = SDL_SCANCODE_PAGEDOWN;
     } else if(key == SDL_SCANCODE_PAGEDOWN) {
-      return key = SDL_SCANCODE_PAGEUP;
+      key = SDL_SCANCODE_PAGEUP;
     }
 #endif
   }

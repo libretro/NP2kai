@@ -502,6 +502,20 @@ static uint16_t j2k_key_kpad3[12] = {
    RETROK_ESCAPE,
    RETROK_RETURN
 };
+static uint16_t j2k_key_kpadf[12] = { 
+   RETROK_KP8,
+   RETROK_KP2,
+   RETROK_KP4,
+   RETROK_KP6,
+   RETROK_x,
+   RETROK_z,
+   RETROK_s,
+   RETROK_a,
+   RETROK_BACKSPACE,
+   RETROK_RSHIFT,
+   RETROK_ESCAPE,
+   RETROK_RETURN
+};
 
 void resetInput(void) {
   int i;
@@ -867,6 +881,43 @@ static void update_variables(void)
          drvno = 0;
       else if (strcmp(var.value, "FDD2") == 0)
          drvno = 1;
+   }
+
+   var.key = "np2kai_keyrepeat";
+   var.value = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "ON") == 0)
+         np2cfg.keyrepeat_enable = 1;
+      else
+         np2cfg.keyrepeat_enable = 0;
+   }
+
+   var.key = "np2kai_keyrepeat_delay";
+   var.value = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "250ms") == 0)
+         np2cfg.keyrepeat_delay = 250;
+      else if (strcmp(var.value, "1000ms") == 0)
+         np2cfg.keyrepeat_delay = 1000;
+      else
+         np2cfg.keyrepeat_delay = 500;
+   }
+
+   var.key = "np2kai_keyrepeat_interval";
+   var.value = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "25ms") == 0)
+         np2cfg.keyrepeat_interval = 25;
+      else if (strcmp(var.value, "100ms") == 0)
+         np2cfg.keyrepeat_interval = 100;
+      else
+         np2cfg.keyrepeat_interval = 50;
    }
 
    var.key = "np2kai_keyboard";
@@ -1480,6 +1531,10 @@ static void update_variables(void)
     } else if(strcmp(var.value, "Atari Joypad") == 0) {
       m_tJoyMode = LR_NP2KAI_JOYMODE_ATARI;
       m_tJoyModeInt = 7;
+    } else if(strcmp(var.value, "Keypad Fighting") == 0) {
+      m_tJoyMode = LR_NP2KAI_JOYMODE_KEY;
+      memcpy(j2k_key, j2k_key_kpadf, sizeof(uint16_t) * 12);
+      m_tJoyModeInt = 8;
     } else {
       m_tJoyMode = LR_NP2KAI_JOYMODE_NONE;
       m_tJoyModeInt = 0;
@@ -1688,6 +1743,9 @@ void retro_run (void)
       }
       resetInput();
       pccore_cfgupdate();
+      if(nevent_iswork(NEVENT_CDWAIT)){
+         nevent_forceexecute(NEVENT_CDWAIT);
+      }
       pccore_reset();
       did_reset = false;
    }

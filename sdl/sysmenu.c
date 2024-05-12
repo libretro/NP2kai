@@ -63,6 +63,9 @@ static void sys_cmd(MENUID id) {
 			sdlkbd_reset();
 #endif
 			pccore_cfgupdate();
+			if(nevent_iswork(NEVENT_CDWAIT)){
+				nevent_forceexecute(NEVENT_CDWAIT);
+			}
 			pccore_reset();
 			break;
 
@@ -442,6 +445,11 @@ static void sys_cmd(MENUID id) {
 			update |= SYS_UPDATEOSCFG;
 			break;
 
+		case MID_KEYREPEAT:
+			np2cfg.keyrepeat_enable ^= 1;
+			update |= SYS_UPDATECFG;
+			break;
+
 		case MID_KEYBOARD_106:
 			np2oscfg.KEYBOARD = KEY_KEY106;
 			update |= SYS_UPDATEOSCFG;
@@ -763,6 +771,7 @@ static void sys_cmd(MENUID id) {
 			update |= SYS_UPDATECFG;
 			break;
 
+#if defined(SUPPORT_LARGE_MEMORY)
 		case MID_MEM5126:
 			np2cfg.EXTMEM = 512;
 			update |= SYS_UPDATECFG;
@@ -772,6 +781,7 @@ static void sys_cmd(MENUID id) {
 			np2cfg.EXTMEM = 1024;
 			update |= SYS_UPDATECFG;
 			break;
+#endif
 #if 0
 		case IDM_SERIAL1:
 			winuienter();
@@ -941,6 +951,8 @@ static void sys_cmd(MENUID id) {
 #endif
 		case MID_EXIT:
 		case SID_CLOSE:
+			scrnmng_setwidth(0, 640);
+			scrnmng_setheight(0, 400);
 			taskmng_exit();
 			break;
 	}
@@ -1007,6 +1019,7 @@ BRESULT sysmenu_menuopen(UINT menutype, int x, int y) {
 	menusys_setcheck(MID_30FPS, (b == 2));
 	menusys_setcheck(MID_20FPS, (b == 3));
 	menusys_setcheck(MID_15FPS, (b == 4));
+	menusys_setcheck(MID_KEYREPEAT, (np2cfg.keyrepeat_enable & 1));
 	b = np2oscfg.KEYBOARD;
 	menusys_setcheck(MID_KEYBOARD_106, (b == KEY_KEY106));
 	menusys_setcheck(MID_KEYBOARD_101, (b == KEY_KEY101));
@@ -1053,20 +1066,19 @@ BRESULT sysmenu_menuopen(UINT menutype, int x, int y) {
 #endif	/* SUPPORT_FMGEN */
 	menusys_setcheck(MID_JASTSND, (np2oscfg.jastsnd & 1));
 	menusys_setcheck(MID_SEEKSND, (np2cfg.MOTOR & 1));
-	b = np2cfg.EXTMEM;
-	menusys_setcheck(MID_MEM640, (b == 0));
-	menusys_setcheck(MID_MEM16, (b == 1));
-	menusys_setcheck(MID_MEM36, (b == 3));
-	menusys_setcheck(MID_MEM76, (b == 7));
-	menusys_setcheck(MID_MEM96, (b == 9));
-	menusys_setcheck(MID_MEM136, (b == 13));
-	menusys_setcheck(MID_MEM166, (b == 16));
-	menusys_setcheck(MID_MEM326, (b == 32));
-	menusys_setcheck(MID_MEM646, (b == 64));
-	menusys_setcheck(MID_MEM1206, (b == 120));
-	menusys_setcheck(MID_MEM2306, (b == 230));
-	menusys_setcheck(MID_MEM5126, (b == 512));
-	menusys_setcheck(MID_MEM10246, (b == 1024));
+	menusys_setcheck(MID_MEM640, (np2cfg.EXTMEM == 0));
+	menusys_setcheck(MID_MEM16, (np2cfg.EXTMEM == 1));
+	menusys_setcheck(MID_MEM36, (np2cfg.EXTMEM == 3));
+	menusys_setcheck(MID_MEM76, (np2cfg.EXTMEM == 7));
+	menusys_setcheck(MID_MEM96, (np2cfg.EXTMEM == 9));
+	menusys_setcheck(MID_MEM136, (np2cfg.EXTMEM == 13));
+	menusys_setcheck(MID_MEM166, (np2cfg.EXTMEM == 16));
+	menusys_setcheck(MID_MEM326, (np2cfg.EXTMEM == 32));
+	menusys_setcheck(MID_MEM646, (np2cfg.EXTMEM == 64));
+	menusys_setcheck(MID_MEM1206, (np2cfg.EXTMEM == 120));
+	menusys_setcheck(MID_MEM2306, (np2cfg.EXTMEM == 230));
+	menusys_setcheck(MID_MEM5126, (np2cfg.EXTMEM == 512));
+	menusys_setcheck(MID_MEM10246, (np2cfg.EXTMEM == 1024));
 	menusys_setcheck(MID_JOYX, (np2cfg.BTN_MODE & 1));
 	menusys_setcheck(MID_RAPID, (np2cfg.BTN_RAPID & 1));
 	menusys_setcheck(MID_MSRAPID, (np2cfg.MOUSERAPID & 1));

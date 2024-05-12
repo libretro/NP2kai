@@ -1,5 +1,5 @@
 # Neko Project II 0.86 kai
-Jul 14, 2020<br>
+Oct 24, 2023<br>
 
 NP2kai is PC-9801 series emulator<br>
 
@@ -73,16 +73,16 @@ On Android, Game Files are need to locate in '/storage/emulated/0/RetroArch' by 
 Game Files cannot locate on external storage.
 </div></details>
 
-### VisualStudio 2019
+### VisualStudio 2022
 
 You should [NP2fmgen](http://nenecchi.kirara.st/) or [NP21/W](https://sites.google.com/site/np21win/home), maybe.
 
 <details><summary>
-VisualStudio 2019
+VisualStudio 2022
 </summary><div>
 
 #### Install tools
-1. Install VisualStudio 2019.
+1. Install VisualStudio 2022.
   - Desktop Development with C++
   - .NET Framework 4.8 SDK
   - C++ ATL
@@ -100,20 +100,21 @@ VisualStudio 2019
   - MSBuild
   - CMake for Windows
   - IntelliCode
-2. Install [vcpkg](https://github.com/Microsoft/vcpkg)
-3. Install packages with vcpkg.
+2. Install [WDK KMDF](https://docs.microsoft.com/ja-jp/windows-hardware/drivers/download-the-wdk)
+3. Install [vcpkg](https://github.com/Microsoft/vcpkg)
+4. Install packages with vcpkg.
   - OpenSSL
   - SDL2 SDL2_mixer SDL2_ttf
   - libusb
-4. Install [Ninja](http://www.projectmanager.ninja/home.html)
+5. Install [Ninja](http://www.projectmanager.ninja/home.html)
 
 #### Build
-1. Start VisualStudio 2019 (and without code).
+1. Start VisualStudio 2022 (and without code).
 2. File -> Open -> CMake -> CMakeLists.txt in NP2kai directory.
 3. Build -> Build all.
 4. Output np21kai_windows.exe in out directory.
 
-- CMake options of VisualStudio 2019 port (*=default)
+- CMake options of VisualStudio 2022 port (*=default)
 
 |name|value|work|output|
 |:---:|:---:|:---:|:---:|
@@ -138,7 +139,7 @@ SDL
 2. Run MSYS2 64bit console.
 3. Run follow command.
 ```
-$ pacman -S git cmake make mingw-w64-x86_64-toolchain mingw-w64-x86_64-ntldd mingw-w64-x86_64-SDL2 mingw-w64-x86_64-SDL2_mixer mingw-w64-x86_64-SDL2_ttf mingw-w64-x86_64-SDL mingw-w64-x86_64-SDL_mixer mingw-w64-x86_64-SDL_ttf mingw-w64-x86_64-openssl
+$ pacman -S git cmake make mingw-w64-x86_64-toolchain mingw-w64-x86_64-ntldd mingw-w64-x86_64-SDL2 mingw-w64-x86_64-SDL2_mixer mingw-w64-x86_64-SDL2_ttf mingw-w64-x86_64-SDL mingw-w64-x86_64-SDL_mixer mingw-w64-x86_64-SDL_ttf mingw-w64-x86_64-openssl mingw-w64-x86_64-libusb
 ```
 - Linux
 1. Run follow command.
@@ -481,9 +482,10 @@ NP2 menu can swap FDD/HDD diskimages.(Swapping HDD need reset.)<br>
 Mounting/Swaping Disk and HDD/CD mounting at start
 </summary><div>
 
-Using libretro contents .m3u file listed floppy disk images,<br>
+Using .m3u file listed floppy disk images,<br>
 You can use libretro swap interface.<br>
 (This file must be wiritten in UTF-8.)<br>
+(On libretro m3u file supported is not in core now.)
 ```
 1st.d88
 2nd.d88
@@ -784,6 +786,14 @@ lr-np2kai="/opt/retropie/emulators/retroarch/bin/retroarch -L /opt/retropie/libr
 ## Informaion
 
 <details><summary>
+Key-repeat (libretro and SDL)
+</summary><div>
+
+To use Key-repeat, enable in menu.<br>
+On default, Key-repeat's delay is 500ms, Key-repeat's interval is 50ms.<br>
+</div></details>
+
+<details><summary>
 Using CD-ROM drive
 </summary><div>
 
@@ -1071,22 +1081,92 @@ HSV/RGB smoothing is heavy to work.<br>
 </div></details>
 
 
-#### MIDI sound (X11)
+#### MIDI sound (libretro)
+
+<details><summary>
+Common
+</summary><div>
+
+Set RetroArch's 'Setting' -&gt; 'Audio' -&gt; 'MIDI' -&gt; 'Output' -&gt; '(MIDI device)' in menu.
+</div></details>
+
+<details><summary>
+Windows
+</summary><div>
+
+NP2kai can use 'Microsoft GS Wavetable Synth'.<br>
+NP2kai can use external MIDI sound generator with UM-1(USB-MIDI interface).<br>
+</div></details>
+
+<details><summary>
+Linux
+</summary><div>
 
 <details><summary>
 External MIDI
 </summary><div>
 
-NP2kai can use external MIDI sound generator with UM-1.<br>
+NP2kai can use external MIDI sound generator with UM-1(USB-MIDI interface).<br>
+</div></details>
+
+<details><summary>
+Timidity++ (software MIDI synthesizer)
+</summary><div>
+
+NP2kai can software synthesizer Timidity++ as ALSA Virtual MIDI.<br>
+
+1. Install Timidity++ and fluid-soundfont
+```
+$ sudo apt install timidity timidity-interfaces-extra fluid-soundfont-gm fluid-soundfont-gs
+```
+2. Edit timidity.cfg
+```
+$ sudo nano /etc/timidity/timidity.cfg
+```
+```
+#source /etc/timidity/freepats.cfg<br>
+source /etc/timidity/fluidr3_gm.cfg
+```
+3. Restart timidity
+```
+$ sudo service timidity restart
+```
+4. Run timidity daemon output to ALSA.
+```
+$ timidity -iA -B2,8 -Os &
+```
+
+5. It maybe able to select 'Timidity port 0' RetroArch's MIDI device.
+
+Next boot computer, you command from 4.
+You can write to .profile, but Timidity daemon spend a bit CPU performance.
+</div></details>
+
+</div></details>
+
+#### MIDI sound (X11)
+
+<details><summary>
+Common
+</summary><div>
+
+NP2kai's MIDI setting is in 'Device' -&gt; 'MIDI option...'.
+
+Set device file to 'Device'\'s 'MIDI-OUT'. (ex. /dev/snd/midiC0D0)<br>
+And set 'Assign''s 'MIDI-OUT' to 'MIDI-OUT device'.
+</div></details>
+
+<details><summary>
+External MIDI
+</summary><div>
+
+NP2kai can use external MIDI sound generator with UM-1(USB-MIDI interface).<br>
 
 1. Connect UM-1 to USB
-2. Check you can see 'C4D0' by '$ ls /dev/snd' command
-3. Open xnp2kai
-- Select xnp2kai's menu 'Device' -> 'MIDI option...'
-- Set '/dev/snd/C4D0' to 'MIDI-OUT' in ’Device' frame
-- Select 'MIDI-OUT device' to 'MIDI-OUT' in ’Assign' frame
-- Press 'OK'
-4. I tried with Touhou 2 (set MIDI option), I can listen MIDI sound.
+2. Check you can see 'midiC4D0' by '$ ls /dev/snd' command
+3. Open xnp2kai and set MIDI device.
+
+I tried with Touhou 2 (set MIDI option), I could listen MIDI sound.
 </div></details>
 
 <details><summary>
@@ -1094,66 +1174,82 @@ Timidity++ (software MIDI synthesizer)
 </summary><div>
 
 NP2kai can software synthesizer Timidity++ as Virtual MIDI.<br>
+To using, necessaly setup Virtual MIDI Port module too.
 
-It seems that Timidity++ is incompatible with PulseAudio.<br>
-By changing to ALSA output, I was able to play sound.<br>
-
-1. Install Timidity++ and fluid-soundfont-gm
+1. Install Timidity++ and fluid-soundfont
 ```
-$ sudo apt-get install timidity fluid-soundfont-gm
+$ sudo apt install timidity timidity-interfaces-extra fluid-soundfont-gm fluid-soundfont-gs
 ```
 2. Edit timidity.cfg
 ```
-$ sudo nano /etc/timidity
+$ sudo nano /etc/timidity/timidity.cfg
 ```
 ```
 #source /etc/timidity/freepats.cfg<br>
 source /etc/timidity/fluidr3_gm.cfg
 ```
-3. restart timidity
+3. Restart timidity
 ```
 $ sudo service timidity restart
 ```
-4. 
-```
-$ aconnect -o
-```
-This time, you can see like Timidity port 128:0 to 128:3.<br>
-5. 
+4. Run timidity daemon output to ALSA.
 ```
 $ timidity -iA -B2,8 -Os &
 ```
-Run timidity daemon output to ALSA.
+You will see like ALSAed Timidity port 128:0 to 128:3.<br>
 ```
 $ aconnect -o
 ```
-This time, you can see like ALSAed Timidity port 129:0 to 129:3.<br>
-6. 
+5. Add virtual MIDI port module.
 ```
 $ sudo modprobe snd-virmidi
 ```
-Add virtual MIDI port module.
+(If you want to use snd-virmidi permanently, see [detail info](https://wiki.archlinux.org/index.php/Timidity%2B%2B).)
 ```
 $ aconnect -o
 ```
-This time, you can see like VirMIDI 3-0 to 3-3 at 28:0 to 31:0.<br>
-7. 
+You can see like VirMIDI 0-0 to 0-3 at 16:0 to 19:0.<br>
+6. You can also see VirMIDI 0-0 to 0-3 as midiC0D0 to midiC0D3.<br>
 ```
 $ ls /dev/snd
 ```
-You can also see VirMIDI 3-0 to 3-3 at midiC3D0 to midiC3D3.<br>
-8. Connect VirMIDI 3-0 and ALSAed Timidity port 0.
+7. Connect VirMIDI 0-0 and ALSAed Timidity port 0.
 ```
-$ aconnect 28:0 129:0
+$ aconnect 16:0 128:0
 ```
-9. Finally set '/dev/snd/midiC3D0' to xnp2kai.
+8. Finally set '/dev/snd/midiC0D0' to xnp2kai.
 
 Next boot computer, you command from 4.
 </div></details>
 
 ## Release
+- Oct 24, 2023
+  - merge NP21/W rev.90
+- Feb 10, 2023
+  - merge NP21/W rev.87,88
+- Jly 31, 2022
+  - merge NP21/W rev.85,86
+    - (Exclusion is_nan, is_inf)
+- Jan 23, 2021
+  - merge NP21/W rev.84
+  - [lr]remove m3u file support
+- Jan 19, 2021
+  - merge NP21/W rev.79
+- Oct 22, 2020
+  (Thanks to @miyamoto999)
+  - Key-repeat
+- Sep 28, 2020
+  - merge NP21/W rev.78
+- Sep 9, 2020
+  - [SDL,lr] Fix GRPH and LWin keycode (thanks miyamoto999!)
+- Sep 4, 2020
+  - Apply to Nixpkgs package
+- Aug 19, 2020
+  - merge NP21/W rev.77
 - Aug 12, 2020
   - fix mouse input off
+- Jul 18, 2020
+  - merge NP21/W rev.76
 - Jul 14, 2020
   - add mouse input off
 - Jun 23, 2020
