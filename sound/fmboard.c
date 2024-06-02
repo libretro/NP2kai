@@ -94,6 +94,43 @@ REG8 fmboard_getjoy(POPNA opna)
 	return ret;
 }
 
+void fmboard_updatevolume(){
+	UINT volex = 15;
+	UINT i;
+	if(g_nSoundID==SOUNDID_WAVESTAR){
+		volex = cs4231.devvolume[0xff];
+	}
+	opngen_setvol(np2cfg.vol_fm * volex / 15 * np2cfg.vol_master / 100);
+#if defined(SUPPORT_FMGEN)
+	opna_fmgen_setallvolumeFM_linear(np2cfg.vol_fm * volex / 15 * np2cfg.vol_master / 100);
+#endif	/* SUPPORT_FMGEN */
+	psggen_setvol(np2cfg.vol_ssg * volex / 15 * np2cfg.vol_master / 100);
+#if defined(SUPPORT_FMGEN)
+	opna_fmgen_setallvolumePSG_linear(np2cfg.vol_ssg * volex / 15 * np2cfg.vol_master / 100);
+#endif	/* SUPPORT_FMGEN */
+
+	adpcm_setvol(np2cfg.vol_adpcm * np2cfg.vol_master / 100);
+#if defined(SUPPORT_FMGEN)
+	opna_fmgen_setallvolumeADPCM_linear(np2cfg.vol_adpcm * np2cfg.vol_master / 100);
+#endif	/* SUPPORT_FMGEN */
+	for (i = 0; i < OPNA_MAX; i++)
+	{
+		adpcm_update(&g_opna[i].adpcm);
+	}
+
+	pcm86gen_setvol(np2cfg.vol_pcm * np2cfg.vol_master / 100);
+	pcm86gen_update();
+	
+	rhythm_setvol(np2cfg.vol_rhythm * volex / 15 * np2cfg.vol_master / 100);
+#if defined(SUPPORT_FMGEN)
+	opna_fmgen_setallvolumeRhythmTotal_linear(np2cfg.vol_rhythm * volex / 15 * np2cfg.vol_master / 100);
+#endif	/* SUPPORT_FMGEN */
+	for (i = 0; i < OPNA_MAX; i++)
+	{
+		rhythm_update(&g_opna[i].rhythm);
+	}
+}
+
 
 // ----
 
@@ -160,6 +197,7 @@ void fmboard_destruct(void)
 void fmboard_reset(const NP2CFG *pConfig, SOUNDID nSoundID)
 {
 	UINT i;
+	UINT8 cross = 0;
 
 	soundrom_reset();
 	beep_reset();												// ver0.27a
@@ -207,12 +245,12 @@ void fmboard_reset(const NP2CFG *pConfig, SOUNDID nSoundID)
 			
 		case SOUNDID_PC_9801_86_WSS:
 			board118_reset(pConfig);
-			board86_reset(pConfig, FALSE);
+			board86_reset(pConfig, TRUE);
 			break;
 			
 		case SOUNDID_PC_9801_86_118:
 			board118_reset(pConfig);
-			board86_reset(pConfig, FALSE);
+			board86_reset(pConfig, TRUE);
 			break;
 			
 		case SOUNDID_MATE_X_PCM:
@@ -230,15 +268,18 @@ void fmboard_reset(const NP2CFG *pConfig, SOUNDID nSoundID)
 
 		case SOUNDID_SPEAKBOARD:
 			boardspb_reset(pConfig, 0);
+			cross ^= pConfig->spb_x;
 			break;
 
 		case SOUNDID_86_SPEAKBOARD:
 			boardspb_reset(pConfig, 1);
 			board86_reset(pConfig, FALSE);
+			cross ^= pConfig->spb_x;
 			break;
 
 		case SOUNDID_SPARKBOARD:
 			boardspr_reset(pConfig);
+			cross ^= pConfig->spb_x;
 			break;
 
 		case SOUNDID_AMD98:
@@ -268,7 +309,7 @@ void fmboard_reset(const NP2CFG *pConfig, SOUNDID nSoundID)
 			
 		case SOUNDID_PC_9801_86_SB16:
 			boardsb16_reset(pConfig);
-			board86_reset(pConfig, FALSE);
+			board86_reset(pConfig, TRUE);
 			break;
 			
 		case SOUNDID_WSS_SB16:
@@ -279,7 +320,7 @@ void fmboard_reset(const NP2CFG *pConfig, SOUNDID nSoundID)
 		case SOUNDID_PC_9801_86_WSS_SB16:
 			boardsb16_reset(pConfig);
 			board118_reset(pConfig);
-			board86_reset(pConfig, FALSE);
+			board86_reset(pConfig, TRUE);
 			break;
 			break;
 			
@@ -291,7 +332,7 @@ void fmboard_reset(const NP2CFG *pConfig, SOUNDID nSoundID)
 		case SOUNDID_PC_9801_86_118_SB16:
 			boardsb16_reset(pConfig);
 			board118_reset(pConfig);
-			board86_reset(pConfig, FALSE);
+			board86_reset(pConfig, TRUE);
 			break;
 #endif
 
@@ -309,7 +350,7 @@ void fmboard_reset(const NP2CFG *pConfig, SOUNDID nSoundID)
 			g_nSoundID = SOUNDID_NONE;
 			break;
 	}
-	soundmng_setreverse(pConfig->snd_x);
+	soundmng_setreverse((pConfig->snd_x ^ cross) & 0x1);
 	opngen_setVR(pConfig->spb_vrc, pConfig->spb_vrl);
 }
 

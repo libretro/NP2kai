@@ -190,7 +190,7 @@ const OEMCHAR	*ext;
 		cylinders = LOADINTELWORD(thd.cylinders);
 		sectors = 33;
 		size = 256;
-		totals = cylinders * sectors * surfaces;
+		totals = (FILEPOS)cylinders * sectors * surfaces;
 	}
 	else if ((iftype == SXSIDRV_SASI) && (!file_cmpname(ext, str_nhd))) {
 		NHDHDR nhd;						// T98Next HDD (IDE)
@@ -215,7 +215,7 @@ const OEMCHAR	*ext;
 		cylinders = LOADINTELDWORD(hdi.cylinders);
 		sectors = LOADINTELDWORD(hdi.sectors);
 		size = LOADINTELDWORD(hdi.sectorsize);
-		totals = cylinders * sectors * surfaces;
+		totals = (FILEPOS)cylinders * sectors * surfaces;
 	}
 	else if ((iftype == SXSIDRV_SCSI) && (!file_cmpname(ext, str_hdd))) {
 		VHDHDR vhd;						// Virtual98 HDD (SCSI)
@@ -231,13 +231,28 @@ const OEMCHAR	*ext;
 		totals = (SINT32)LOADINTELDWORD(vhd.totals);
 	}
 	else if ((iftype == SXSIDRV_SCSI) && (!file_cmpname(ext, str_hdn))) {
-		// RaSCSI flat disk image (NEC PC-9801-55)
+		// RaSCSI flat disk image for NEC PC-9801-55
 		FILELEN fsize = file_getsize(fh);
 		headersize = 0;
 		size = 512;
 		surfaces = 8;
-		sectors = 25;
-		cylinders = (UINT32)(fsize / (sectors * surfaces * size));
+		if(np2cfg.rascsi92){
+			sectors = 32;
+		}else{
+			sectors = 25;
+		}
+		cylinders = (UINT32)(fsize / ((FILELEN)sectors * surfaces * size));
+		totals = fsize / size;
+		// totals = (FILEPOS)cylinders * sectors * surfaces;
+	}
+	else if ((iftype == SXSIDRV_SCSI) && (!file_cmpname(ext, str_hds))) {
+		// RaSCSI flat disk image
+		FILELEN fsize = file_getsize(fh);
+		headersize = 0;
+		size = 512;
+		surfaces = 8;
+		sectors = 32;
+		cylinders = (UINT32)(fsize / ((FILELEN)sectors * surfaces * size));
 		totals = fsize / size;
 		// totals = (FILEPOS)cylinders * sectors * surfaces;
 	}

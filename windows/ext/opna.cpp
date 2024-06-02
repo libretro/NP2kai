@@ -21,12 +21,12 @@
 static void writeRegister(POPNA opna, UINT nAddress, REG8 cData);
 static void writeExtendedRegister(POPNA opna, UINT nAddress, REG8 cData);
 
-// dB = 20 log10( (‰¹—Ê0`1) * (pow(10, Å‘ådB’l/20) - pow(10, Å¬dB’l/20)) + pow(10, Å¬dB’l/20) )
+// dB = 20 log10( (éŸ³é‡0ï½1) * (pow(10, æœ€å¤§dBå€¤/20) - pow(10, æœ€å°dBå€¤/20)) + pow(10, æœ€å°dBå€¤/20) )
 //#define LINEAR2DB(a)	(20 * log10((a) * (pow(10.0, 20/20) - pow(10.0, -192/20)) + pow(10.0, -192/20)))
-#define LINEAR2DB(a)	(pow(a,0.12)*(20+192) - 192)	// XXX: fmgen‰¹—Ê‚Æ”L‰¹Œ¹‰¹—Ê‚ğˆê’v‚³‚¹‚é‚½‚ß‚ÌÀŒ±®¥¥¥
+#define LINEAR2DB(a)	(pow(a,0.12)*(20+192) - 192)	// XXX: fmgenéŸ³é‡ã¨çŒ«éŸ³æºéŸ³é‡ã‚’ä¸€è‡´ã•ã›ã‚‹ãŸã‚ã®å®Ÿé¨“å¼ï½¥ï½¥ï½¥
 
 #if defined(SUPPORT_FMGEN)
-// XXX: ‰¹—Ê’²®‚ğo—ˆ‚é‚æ‚¤‚É‚·‚é‚½‚ß‚É‚Æ‚è‚ ‚¦‚¸¥¥¥
+// XXX: éŸ³é‡èª¿æ•´ã‚’å‡ºæ¥ã‚‹ã‚ˆã†ã«ã™ã‚‹ãŸã‚ã«ã¨ã‚Šã‚ãˆãšï½¥ï½¥ï½¥
 POPNA opnalist[OPNA_MAX] = {0}; 
 int opnalistconunt = 0;
 void opnalist_push(POPNA opna)
@@ -143,7 +143,7 @@ void opna_reset(POPNA opna, REG8 cCaps)
 		OEMCHAR path[MAX_PATH];
 		char strbuf[MAX_PATH];
 
-		OPNA_Init(opna->fmgen, OPNA_CLOCK*2, np2cfg.samplingrate, false, ""); // ƒTƒ“ƒvƒŠƒ“ƒOƒŒ[ƒg‹­§•ÏX¥¥¥
+		OPNA_Init(opna->fmgen, OPNA_CLOCK*2, np2cfg.samplingrate, false, ""); // ã‚µãƒ³ãƒ—ãƒªãƒ³ã‚°ãƒ¬ãƒ¼ãƒˆå¼·åˆ¶å¤‰æ›´ï½¥ï½¥ï½¥
 		getbiospath(path, OEMTEXT(""), NELEMENTS(path));
 #ifdef UNICODE
 		wcstombs(strbuf, path, MAX_PATH);
@@ -151,10 +151,10 @@ void opna_reset(POPNA opna, REG8 cCaps)
 		strcpy(strbuf, path);
 #endif
 		OPNA_LoadRhythmSample(opna->fmgen, strbuf);
-		OPNA_SetVolumeFM(opna->fmgen, (int)LINEAR2DB((double)np2cfg.vol_fm / 128));
-		OPNA_SetVolumePSG(opna->fmgen, (int)LINEAR2DB((double)np2cfg.vol_ssg / 128));
-		OPNA_SetVolumeADPCM(opna->fmgen, (int)LINEAR2DB((double)np2cfg.vol_adpcm / 128));
-		OPNA_SetVolumeRhythmTotal(opna->fmgen, (int)LINEAR2DB((double)np2cfg.vol_rhythm / 128));
+		OPNA_SetVolumeFM(opna->fmgen, (int)LINEAR2DB((double)np2cfg.vol_fm / 128 * np2cfg.vol_master / 100));
+		OPNA_SetVolumePSG(opna->fmgen, (int)LINEAR2DB((double)np2cfg.vol_ssg / 128 * np2cfg.vol_master / 100));
+		OPNA_SetVolumeADPCM(opna->fmgen, (int)LINEAR2DB((double)np2cfg.vol_adpcm / 128 * np2cfg.vol_master / 100));
+		OPNA_SetVolumeRhythmTotal(opna->fmgen, (int)LINEAR2DB((double)np2cfg.vol_rhythm / 128 * np2cfg.vol_master / 100));
 		OPNA_Reset(opna->fmgen);
 		OPNA_SetReg(opna->fmgen, 0x07, 0xbf);
 		OPNA_SetReg(opna->fmgen, 0x0e, 0xff);
@@ -171,7 +171,7 @@ void opna_reset(POPNA opna, REG8 cCaps)
 		}
 		opna->usefmgen = 1;
 	}else{
-		opna->usefmgen = 0; // fmgen‚ğg‚í‚È‚¢
+		opna->usefmgen = 0; // fmgenã‚’ä½¿ã‚ãªã„
 	}
 #endif	/* SUPPORT_FMGEN */
 
@@ -190,15 +190,15 @@ void opna_reset(POPNA opna, REG8 cCaps)
 		}
 	}
 	
-	// ‰¹—Ê‰Šú‰»
-	opngen_setvol(np2cfg.vol_fm);
-	psggen_setvol(np2cfg.vol_ssg);
-	rhythm_setvol(np2cfg.vol_rhythm);
+	// éŸ³é‡åˆæœŸåŒ–
+	opngen_setvol(np2cfg.vol_fm * np2cfg.vol_master / 100);
+	psggen_setvol(np2cfg.vol_ssg * np2cfg.vol_master / 100);
+	rhythm_setvol(np2cfg.vol_rhythm * np2cfg.vol_master / 100);
 #if defined(SUPPORT_FMGEN)
 	if(np2cfg.usefmgen) {
-		opna_fmgen_setallvolumeFM_linear(np2cfg.vol_fm);
-		opna_fmgen_setallvolumePSG_linear(np2cfg.vol_ssg);
-		opna_fmgen_setallvolumeRhythmTotal_linear(np2cfg.vol_rhythm);
+		opna_fmgen_setallvolumeFM_linear(np2cfg.vol_fm * np2cfg.vol_master / 100);
+		opna_fmgen_setallvolumePSG_linear(np2cfg.vol_ssg * np2cfg.vol_master / 100);
+		opna_fmgen_setallvolumeRhythmTotal_linear(np2cfg.vol_rhythm * np2cfg.vol_master / 100);
 	}
 #endif	/* SUPPORT_FMGEN */
 	for (UINT i = 0; i < NELEMENTS(g_opna); i++)
@@ -381,6 +381,10 @@ void opna_bind(POPNA opna)
 		if (!pExt)
 		{
 			sound_streamregist(opna->fmgen, (SOUNDCB)OPNA_Mix);
+		}
+		if (cCaps & OPNA_HAS_RHYTHM)
+		{
+			rhythm_bind(&opna->rhythm);
 		}
 	} else {
 #endif	/* SUPPORT_FMGEN */

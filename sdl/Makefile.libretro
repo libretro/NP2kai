@@ -1,8 +1,24 @@
 DEBUG ?= 0
-GIT_TAG := "$(shell git describe --tags --abbrev=0)"
-GIT_HASH := "$(shell git rev-parse --short HEAD)"
 HAS_GCC = 1
 ENDIANNESS_DEFINES=
+
+# Nixpkgs has not Git. Need version and hash is given by env variants.
+ifneq ($(NP2KAI_VERSION),)
+GIT_TAG := $(NP2KAI_VERSION)
+else
+GIT_TAG := $(shell git describe --tags --abbrev=0)
+endif
+ifneq ($(NP2KAI_HASH),)
+GIT_HASH := $(NP2KAI_HASH)
+else
+GIT_HASH := $(shell git rev-parse --short HEAD)
+endif
+ifeq ($(GIT_TAG),)
+GIT_TAG := rev.22
+endif
+ifeq ($(GIT_HASH),)
+GIT_TAG := 40eed6a
+endif
 
 C_VER = -std=gnu99
 CXX_VER =
@@ -125,6 +141,9 @@ else ifeq ($(platform), osx)
 	CFLAGS += -mmacosx-version-min=10.7
 	CXXFLAGS += -mmacosx-version-min=10.7 -stdlib=libc++
 	LDFLAGS += -mmacosx-version-min=10.7 -stdlib=libc++
+	ifeq ($(CROSS_COMPILE),1)
+		ARCHFLAGS   = -target $(LIBRETRO_APPLE_PLATFORM) -isysroot $(LIBRETRO_APPLE_ISYSROOT)
+	endif
 	ifndef ($(NOUNIVERSAL))
 		CFLAGS	+= $(ARCHFLAGS)
 		CXXFLAGS	+= $(ARCHFLAGS)
@@ -176,6 +195,8 @@ else ifeq ($(platform), tvos-arm64)
 	ifeq ($(IOSSDK),)
 		IOSSDK := $(shell xcodebuild -version -sdk appletvos Path)
 	endif
+	CC = cc -arch arm64 -isysroot $(IOSSDK)
+	CXX = c++ -arch arm64 -isysroot $(IOSSDK)
 	CXX_VER = -std=c++11
 	LDFLAGS += -stdlib=libc++
 

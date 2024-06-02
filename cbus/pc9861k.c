@@ -95,7 +95,7 @@ static void pc9861_makeclk(PC9861CH m, UINT32 mul2) {
 
 static void pc9861ch1_open(void) {
 
-	cm_pc9861ch1 = commng_create(COMCREATE_PC9861K1);
+	cm_pc9861ch1 = commng_create(COMCREATE_PC9861K1, FALSE);
 
 	pc9861k.ch1.dip = np2cfg.pc9861sw[0];
 	pc9861k.ch1.speed = pc9861k_getspeed(pc9861k.ch1.dip);
@@ -109,7 +109,7 @@ static void pc9861ch1_open(void) {
 
 static void pc9861ch2_open(void) {
 
-	cm_pc9861ch2 = commng_create(COMCREATE_PC9861K2);
+	cm_pc9861ch2 = commng_create(COMCREATE_PC9861K2, FALSE);
 
 	pc9861k.ch2.dip = np2cfg.pc9861sw[2];
 	pc9861k.ch2.speed = pc9861k_getspeed(pc9861k.ch2.dip);
@@ -228,7 +228,9 @@ static REG8 IOINPCALL pc9861k_ib0(UINT port) {
 	if (cm_pc9861ch1 == NULL) {
 		pc9861ch1_open();
 	}
-	(void)port;
+	if (cm_pc9861ch1 == NULL) {
+		return 0;
+	}
 	return(cm_pc9861ch1->getstat(cm_pc9861ch1) | pc9861k.ch1.vect);
 }
 
@@ -237,7 +239,9 @@ static REG8 IOINPCALL pc9861k_ib2(UINT port) {
 	if (cm_pc9861ch2 == NULL) {
 		pc9861ch2_open();
 	}
-	(void)port;
+	if (cm_pc9861ch1 == NULL) {
+		return 0;
+	}
 	return(cm_pc9861ch2->getstat(cm_pc9861ch2) | pc9861k.ch2.vect);
 }
 
@@ -302,6 +306,13 @@ void pc9861k_reset(const NP2CFG *pConfig) {
 	pc9861k.ch1 = pc9861def;
 	pc9861k.ch2 = pc9861def;
 	pc9861k.en = pConfig->pc9861enable & 1;
+	
+	if(cm_pc9861ch1 == NULL){
+		cm_pc9861ch1 = commng_create(COMCREATE_PC9861K1, TRUE);
+	}
+	if(cm_pc9861ch2 == NULL){
+		cm_pc9861ch2 = commng_create(COMCREATE_PC9861K2, TRUE);
+	}
 }
 
 void pc9861k_bind(void) {

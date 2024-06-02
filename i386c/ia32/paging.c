@@ -799,7 +799,7 @@ do { \
 #define	TLB_IS_WRITABLE(ep)	((ep)->tag & CPU_PTE_WRITABLE)
 #define	TLB_IS_USERMODE(ep)	((ep)->tag & CPU_PTE_USER_MODE)
 #define	TLB_IS_DIRTY(ep)	((ep)->tag & TLB_ENTRY_TAG_DIRTY)
-#if (CPU_FEATURES & CPU_FEATURE_PGE) == CPU_FEATURE_PGE
+#if (CPU_FEATURES_ALL & CPU_FEATURE_PGE) == CPU_FEATURE_PGE
 #define	TLB_IS_GLOBAL(ep)	((ep)->tag & TLB_ENTRY_TAG_GLOBAL)
 #else
 #define	TLB_IS_GLOBAL(ep)	0
@@ -812,7 +812,7 @@ do { \
 } while (/*CONSTCOND*/ 0)
 
 #define	NTLB		2	/* 0: DTLB, 1: ITLB */
-#define	NENTRY		(1 << 8)
+#define	NENTRY		(1 << 6)
 #define	TLB_ENTRY_SHIFT	12
 #define	TLB_ENTRY_MASK	(NENTRY - 1)
 

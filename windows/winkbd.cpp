@@ -2,6 +2,7 @@
 #include	<np2.h>
 #include	"winkbd.h"
 #include	<keystat.h>
+#include	<np2mt.h>
 
 
 #define		NC		0xff
@@ -52,8 +53,8 @@ static UINT8 key106[256] = {
 //				  NC,0x73,0x4d,  NC,  NC,  NC,  NC,  NC,			// ver0.28
 			//	    ,    ,    ,    ,    ,    ,    ,    		; 0x98
 				  NC,  NC,  NC,  NC,  NC,  NC,  NC,  NC,
-			//	    ,    ,    ,    ,    ,    ,    ,    		; 0xa0
-				  NC,  NC,  NC,  NC,  NC,  NC,  NC,  NC,
+			//	SFTL,SFTR,    ,    ,    ,    ,    ,    		; 0xa0
+				0x70,0x7d,  NC,  NC,  NC,  NC,  NC,  NC,
 			//	    ,    ,    ,    ,    ,    ,    ,    		; 0xa8
 				  NC,  NC,  NC,  NC,  NC,  NC,  NC,  NC,
 			//	    ,    ,    ,    ,    ,    ,    ,    		; 0xb0
@@ -118,7 +119,7 @@ static const UINT8 key106ext[256] = {
 				  NC,  NC,  NC,  NC,  NC,  NC,  NC,  NC,
 			//	    ,    ,    ,    ,    ,    ,    ,    		; 0x98
 				  NC,  NC,  NC,  NC,  NC,  NC,  NC,  NC,
-			//	    ,    ,    ,    ,    ,    ,    ,    		; 0xa0
+			//	SFTL,SFTR,    ,    ,    ,    ,    ,    		; 0xa0
 				  NC,  NC,  NC,  NC,  NC,  NC,  NC,  NC,
 			//	    ,    ,    ,    ,    ,    ,    ,    		; 0xa8
 				  NC,  NC,  NC,  NC,  NC,  NC,  NC,  NC,
@@ -150,6 +151,12 @@ static const UINT8 f12keys[] = {
 void winkbd_keydown(WPARAM wParam, LPARAM lParam) {
 
 	UINT8	data;
+	
+	np2_multithread_EnterCriticalSection();
+	if (wParam == VK_SHIFT) {
+		UINT scancode = (lParam & 0x00ff0000) >> 16;
+		wParam = MapVirtualKey(scancode, MAPVK_VSC_TO_VK_EX);
+	}
 
 	data = key106[wParam & 0xff];
 	if (data != NC) {
@@ -165,7 +172,15 @@ void winkbd_keydown(WPARAM wParam, LPARAM lParam) {
 			keystat_senddata(0x70);							// PC/AT only!
 			data = key106ext[wParam & 0xff];
 		}
-		keystat_senddata(data);
+		if ((np2oscfg.KEYBOARD == KEY_KEY106 && data == 0x79))
+		{
+			// APPキー特例
+			keystat_senddataraw(data);
+		}
+		else
+		{
+			keystat_senddata(data);
+		}
 	}
 	else {													// ver0.28
 		if ((!np2oscfg.KEYBOARD != KEY_PC98) && (wParam == 0x0c)) {
@@ -173,11 +188,18 @@ void winkbd_keydown(WPARAM wParam, LPARAM lParam) {
 			keystat_senddata(0x47);
 		}
 	}
+	np2_multithread_LeaveCriticalSection();
 }
 
 void winkbd_keyup(WPARAM wParam, LPARAM lParam) {
 
 	UINT8	data;
+	
+	np2_multithread_EnterCriticalSection();
+	if (wParam == VK_SHIFT) {
+		UINT scancode = (lParam & 0x00ff0000) >> 16;
+		wParam = MapVirtualKey(scancode, MAPVK_VSC_TO_VK_EX);
+	}
 
 	data = key106[wParam & 0xff];
 	if (data != NC) {
@@ -193,7 +215,15 @@ void winkbd_keyup(WPARAM wParam, LPARAM lParam) {
 			keystat_senddata(0x70 | 0x80);				// PC/AT only
 			data = key106ext[wParam & 0xff];
 		}
-		keystat_senddata((UINT8)(data | 0x80));
+		if (((np2oscfg.KEYBOARD != KEY_PC98) && data == 0x79))
+		{
+			// APPキー特例
+			keystat_senddataraw((UINT8)(data | 0x80));
+		}
+		else
+		{
+			keystat_senddata((UINT8)(data | 0x80));
+		}
 	}
 	else {												// ver0.28
 		if ((np2oscfg.KEYBOARD != KEY_PC98) && (wParam == 0x0c)) {
@@ -201,6 +231,7 @@ void winkbd_keyup(WPARAM wParam, LPARAM lParam) {
 			keystat_senddata(0x47 | 0x80);
 		}
 	}
+	np2_multithread_LeaveCriticalSection();
 }
 
 void winkbd_roll(BOOL pcat) {
@@ -232,9 +263,11 @@ void winkbd_setf12(UINT f12key) {
 void winkbd_resetf12(void) {
 
 	UINT	i;
-
+	
+	np2_multithread_EnterCriticalSection();
 	for (i=0; i<NELEMENTS(f12keys); i++) {
 		keystat_forcerelease(f12keys[i]);
 	}
+	np2_multithread_LeaveCriticalSection();
 }
 

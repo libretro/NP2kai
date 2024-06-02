@@ -272,18 +272,18 @@ UINT32 IOOUTCALL pcidev_r32(UINT port) {
 
 static void IOOUTCALL pci_o063c(UINT port, REG8 dat) {
 
-	// とりあえずバンク切り替えらしきが出来るように･･･（手抜きなので頻繁に切り替えられると困る）
+	//// とりあえずバンク切り替えらしきが出来るように･･･（手抜きなので頻繁に切り替えられると困る）
 	switch(dat & 0x3) {
-		case 0x01:
+		case 0x1:
 			if((pcidev.membankd8 & 0x3) != 0x01){
 				memcpy(pcidev.biosromtmp, mem + 0x0d8000, 0x8000);
 				memcpy(mem + 0x0d8000, pcidev.biosrom, 0x8000);
 			}
 			break;
 
-		case 0x10:
-		case 0x11:
-		case 0x00:
+		case 0x2:
+		case 0x3:
+		case 0x0:
 		default:
 			if((pcidev.membankd8 & 0x3) == 0x01){
 				memcpy(pcidev.biosrom, mem + 0x0d8000, 0x8000);
@@ -524,8 +524,8 @@ void pcidev_bind(void) {
 	}
 	
 	// バンク切り替え
-	iocore_attachout(0x63c, pci_o063c);
-	iocore_attachinp(0x63c, pci_i063c);
+	//iocore_attachout(0x63c, pci_o063c);
+	//iocore_attachinp(0x63c, pci_i063c);
 	
 	//iocore_attachout(0x18f0, pci_o18f0);
 	//iocore_attachout(0x18f2, pci_o18f2);
@@ -578,7 +578,6 @@ void pcidev_bind(void) {
 		pcidev_updateRoutingTable();
 	}
 }
-
 void pcidev_updateRoutingTable(){
 	UINT16 i;
 	UINT16 allpciirq = (1<<12)|(1<<6)|(1<<5)|(1<<3);

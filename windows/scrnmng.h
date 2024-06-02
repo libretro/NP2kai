@@ -147,6 +147,9 @@ void scrnmng_bltwab(void);
 
 void scrnmng_getrect(RECT *lpRect);
 
+void scrnmng_delaychangemode();
+void scrnmng_UIThreadProc();
+
 #if defined(SUPPORT_DCLOCK)
 BOOL scrnmng_isdispclockclick(const POINT *pt);
 void scrnmng_dispclock(void);

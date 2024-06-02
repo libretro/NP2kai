@@ -21,6 +21,8 @@
 #include <mousemng.h>
 #include <font/font.h>
 
+extern UINT8	np2userpause;
+
 /**
  * 検索
  * @param[in] hMenu メニュー ハンドル
@@ -319,7 +321,10 @@ void xmenu_update(HMENU hMenu)
 	{
 		return;
 	}
-
+	
+	// Emulate
+	CheckMenuItem(hMenu, IDM_PAUSE, MF_BYCOMMAND | MFCHECK(np2userpause));
+	
 	// Screen
 	const bool bFullScreen = ((g_scrnmode & SCRNMODE_FULLSCREEN) != 0);
 	CheckMenuItem(hMenu, IDM_WINDOW, MF_BYCOMMAND | MFCHECK(!bFullScreen));
@@ -459,6 +464,7 @@ DRAW_SKIP;
 	// Device-Mouse
 	CheckMenuItem(hMenu, IDM_MOUSERAW, MF_BYCOMMAND | MFCHECK(np2oscfg.rawmouse));
 	CheckMenuItem(hMenu, IDM_MOUSENC,  MF_BYCOMMAND | MFCHECK(np2oscfg.mouse_nc));
+	CheckMenuItem(hMenu, IDM_MOUSEWHEELCTL, MF_BYCOMMAND | MFCHECK(np2oscfg.usewheel));
 	const UINT8 MMUL = (UINT8)np2oscfg.mousemul;
 	const UINT8 MDIV = (UINT8)np2oscfg.mousediv;
 	CheckMenuItem(hMenu, IDM_MOUSE30X, MF_BYCOMMAND | MFCHECK(MMUL == 3 && MDIV == 1));
@@ -531,4 +537,5 @@ DRAW_SKIP;
 #if !defined(SUPPORT_HOSTDRV)
 	EnableMenuItem(hMenu, IDM_HOSTDRVOPT, MF_GRAYED);
 #endif
+	
 }

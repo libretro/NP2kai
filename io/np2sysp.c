@@ -75,6 +75,8 @@ static const OEMCHAR str_mhz[] = OEMTEXT("%uMHz");
 #define NP21W_SWITCH_PCIENABLE			4
 #define NP21W_SWITCH_ASYNCCPU			5
 #define NP21W_SWITCH_DISABLESOUNDROM	6
+#define NP21W_SWITCH_SETIDEWAIT_R		7
+#define NP21W_SWITCH_SETIDEWAIT_W		8
 
 
 static void setoutstr(const OEMCHAR *str) {
@@ -160,6 +162,7 @@ static void np2sysp_cngclkmul(const void *arg1, long arg2) {
 
 	OEMCHAR	str[64];
 	UINT8 oldclockmul = pccore.maxmultiple;
+	UINT8 oldclockmult = pccore.multiple;
 	UINT8 newclockmul = (np2sysp.outval >> 24);
 	
 	if(newclockmul > 0) {
@@ -169,6 +172,7 @@ static void np2sysp_cngclkmul(const void *arg1, long arg2) {
 		pccore.maxmultiple = newclockmul;
 		pccore.realclock = pccore.baseclock * pccore.multiple;
 		
+		pcm86_changeclock(oldclockmult);
 		sound_changeclock();
 		beep_changeclock();
 		mpu98ii_changeclock();
@@ -180,7 +184,7 @@ static void np2sysp_cngclkmul(const void *arg1, long arg2) {
 		gdc_updateclock();
 	}
 
-	OEMSPRINTF(str, OEMTEXT("%d"), pccore.maxmultiple);
+	OEMSPRINTF(str, OEMTEXT("%u"), pccore.maxmultiple);
 	setoutstr(str);
 	(void)arg1;
 	(void)arg2;
@@ -201,7 +205,7 @@ static void np2sysp_getconfig(const void *arg1, long arg2) {
 #if defined(SUPPORT_WAB) && defined(SUPPORT_CL_GD5430)
 		configvalue16 = np2clvga.gd54xxtype;
 #endif
-		OEMSNPRINTF(str, sizeof(str), OEMTEXT("%d"), configvalue16);
+		OEMSNPRINTF(str, sizeof(str), OEMTEXT("%u"), configvalue16);
 		setoutstr(str);
 		return;
 	case NP21W_SWITCH_PCIENABLE:
@@ -217,12 +221,20 @@ static void np2sysp_getconfig(const void *arg1, long arg2) {
 	case NP21W_SWITCH_DISABLESOUNDROM:
 		configvalue = 0; // 常時0
 		break;
+#if defined(SUPPORT_IDEIO)
+	case NP21W_SWITCH_SETIDEWAIT_R:
+		configvalue = (UINT8)(ideio.rwait >> 8);
+		break;
+	case NP21W_SWITCH_SETIDEWAIT_W:
+		configvalue = (UINT8)(ideio.wwait >> 8);
+		break;
+#endif
 	case NP21W_SWITCH_DUMMY:
 	default:
 		break;
 	}
 
-	OEMSNPRINTF(str, sizeof(str), OEMTEXT("%d"), configvalue);
+	OEMSNPRINTF(str, sizeof(str), OEMTEXT("%u"), configvalue);
 	setoutstr(str);
 	(void)arg1;
 	(void)arg2;
@@ -308,7 +320,7 @@ static void np2sysp_cngconfig(const void *arg1, long arg2) {
 		np2wab.paletteChanged = 1;
 		pc98_cirrus_vga_resetresolution();
 #endif
-		OEMSNPRINTF(str, sizeof(str), OEMTEXT("%d"), configvalue16);
+		OEMSNPRINTF(str, sizeof(str), OEMTEXT("%u"), configvalue16);
 		setoutstr(str);
 		return;
 	case NP21W_SWITCH_PCIENABLE:
@@ -316,7 +328,24 @@ static void np2sysp_cngconfig(const void *arg1, long arg2) {
 		if(configvalue==0){
 			pcidev.enable = configvalue;
 		}else{
-			// TODO: 無効→有効にする場合のコードを書く
+			if(!pcidev.enable){
+				int oldusepci = np2cfg.usepci;
+				np2cfg.usepci = 1;
+				pcidev_reset(&np2cfg);
+				pcidev_bind();
+#if defined(SUPPORT_WAB) && defined(SUPPORT_CL_GD5430)
+				// 作り直し
+				pc98_cirrus_vga_unbind();
+				pc98_cirrus_vga_bind();
+				np2clvga.VRAMWindowAddr2 = 0;
+				np2clvga.VRAMWindowAddr3 = 0;
+				pc98_cirrus_vga_initVRAMWindowAddr();
+				np2clvga.mmioenable = 0;
+				np2wab.paletteChanged = 1;
+				pc98_cirrus_vga_resetresolution();
+#endif
+				np2cfg.usepci = oldusepci;
+			}
 		}
 		configvalue = pcidev.enable;
 #endif
@@ -332,12 +361,20 @@ static void np2sysp_cngconfig(const void *arg1, long arg2) {
 			soundrom_reset(); // サウンドROMを消す
 		}
 		break;
+#if defined(SUPPORT_IDEIO)
+	case NP21W_SWITCH_SETIDEWAIT_R:
+		ideio.rwait = configvalue << 8;
+		break;
+	case NP21W_SWITCH_SETIDEWAIT_W:
+		ideio.wwait = configvalue << 8;
+		break;
+#endif
 	case NP21W_SWITCH_DUMMY:
 	default:
 		break;
 	}
 
-	OEMSNPRINTF(str, sizeof(str), OEMTEXT("%d"), configvalue);
+	OEMSNPRINTF(str, sizeof(str), OEMTEXT("%u"), configvalue);
 	setoutstr(str);
 	(void)arg1;
 	(void)arg2;

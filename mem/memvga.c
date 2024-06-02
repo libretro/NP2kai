@@ -12,6 +12,10 @@
 #include	<io/iocore.h>
 #include	<mem/memvga.h>
 #include	<vram/vram.h>
+#if defined(SUPPORT_IA32_HAXM)
+#include	<i386hax/haxfunc.h>
+#include	<i386hax/haxcore.h>
+#endif
 
 
 // ---- macros
@@ -106,7 +110,9 @@ void MEMCALL memvgaf_wr16(UINT32 address, REG16 value) {
 }
 
 UINT32 MEMCALL memvgaf_rd32(UINT32 address){
-	return (UINT32)memvgaf_rd16(address)|(memvgaf_rd16(address+2)<<16);
+	UINT32 r = (UINT32)memvgaf_rd16(address);
+	r |= (UINT32)memvgaf_rd16(address+2) << 16;
+	return r;
 }
 void MEMCALL memvgaf_wr32(UINT32 address, UINT32 value){
 	memvgaf_wr16(address, (REG16)value);
@@ -274,7 +280,6 @@ REG8 MEMCALL memvgaio_rd8(UINT32 address) {
 	UINT	pos;
 	
 	if(address > 0xe0000 + 0x0100){
-		UINT	pos;
 		REG8 ret;
 		pos = address - 0xe0000 - 0x0100;
 	
@@ -299,7 +304,7 @@ REG8 MEMCALL memvgaio_rd8(UINT32 address) {
 			//          +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 			// plane7   |<---   ofs = 1Dh           --->|<---   ofs = 1Ch           --->|
 			//  (bit7)  +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-			if(vramop.mio2[PEGC_REG_PLANE_ROP] & 0x8000){
+			if(LOADINTELWORD(vramop.mio2+PEGC_REG_PLANE_ROP) & 0x8000){
 				// 1 palette x 16 pixels
 				//      bit8     〜     bit0
 				// pix0 <-- E0120h(8bit) -->     LOADINTELWORD vramop.mio2[PEGC_REG_PATTERN + 0x1C], vramop.mio2[PEGC_REG_PATTERN + 0x18], ... , vramop.mio2[PEGC_REG_PATTERN + 0x00] (bit0)
@@ -322,7 +327,7 @@ REG8 MEMCALL memvgaio_rd8(UINT32 address) {
 					int i;
 					int bit = pos / 4;
 					for(i=7;i>=0;i--){
-						ret |= (vramop.mio2[PEGC_REG_PATTERN + i*4] >> bit) & 0x1;
+						ret |= (vramop.mio2[PEGC_REG_PATTERN + (7-i)*4] >> bit) & 0x1;
 						ret <<= 1;
 					}
 				}
@@ -362,24 +367,23 @@ void MEMCALL memvgaio_wr8(UINT32 address, REG8 value) {
 	UINT	pos;
 	
 	if(address > 0xe0000 + 0x0100){
-		UINT	pos;
 		pos = address - 0xe0000 - 0x0100;
 	
 		if(PEGC_REG_PATTERN <= pos){
-			if(vramop.mio2[PEGC_REG_PLANE_ROP] & 0x8000){
-				// 1 palette x 8 pixels
+			if(LOADINTELWORD(vramop.mio2+PEGC_REG_PLANE_ROP) & 0x8000){
+				// 1 palette x 16 pixels
 				if((pos & 0x3)==0 && pos < 0x60){
 					int i;
-					int bit = pos / 4;
-					for(i=0;i<7;i++){
-						UINT8 tmp = vramop.mio2[PEGC_REG_PATTERN + i*4];
+					int bit = (pos - PEGC_REG_PATTERN) / 4;
+					for(i=0;i<8;i++){
+						UINT16 tmp = LOADINTELWORD(vramop.mio2 + PEGC_REG_PATTERN + (7-i)*4);
 						tmp = (tmp & ~(1 << bit)) | ((value & 1) << bit);
-						vramop.mio2[PEGC_REG_PATTERN + i*4] = tmp;
+						STOREINTELWORD(vramop.mio2 + PEGC_REG_PATTERN + (7-i)*4, tmp);
 						value >>= 1;
 					}
 				}
 			}else{
-				// 8 pixels x 8 planes
+				// 16 pixels x 8 planes
 				if((pos & 0x3)==0 && pos < 0x40){
 					vramop.mio2[pos] = value;
 				}
@@ -397,6 +401,10 @@ void MEMCALL memvgaio_wr8(UINT32 address, REG8 value) {
 	pos = address - 0x0004;
 	if (pos < 4) {
 		vramop.mio1[pos] = value;
+#if defined(SUPPORT_IA32_HAXM)
+		i386hax_vm_setmemoryarea(vramex + ((vramop.mio1[0] & 15) << 15), 0xA8000, 0x8000);
+		i386hax_vm_setmemoryarea(vramex + ((vramop.mio1[2] & 15) << 15), 0xB0000, 0x8000);
+#endif
 		return;
 	}
 	pos = address - 0x0100;
@@ -412,6 +420,12 @@ void MEMCALL memvgaio_wr8(UINT32 address, REG8 value) {
 			}
 		}
 		vramop.mio2[pos] = value;
+		//if(pos == PEGC_REG_LENGTH){
+			pegc.remain = (LOADINTELDWORD(vramop.mio2 + PEGC_REG_LENGTH) & 0x0fff) + 1;
+			pegc.lastdatalen = 0;
+		//}else{
+		//	//STOREINTELDWORD(vramop.mio2 + PEGC_REG_LENGTH, 16-1);
+		//}
 		return;
 	}
 }
@@ -445,7 +459,7 @@ REG16 MEMCALL memvgaio_rd16(UINT32 address) {
 			//          +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 			// plane7   |<---   ofs = 1Dh           --->|<---   ofs = 1Ch           --->|
 			//  (bit7)  +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-			if(vramop.mio2[PEGC_REG_PLANE_ROP] & 0x8000){
+			if(LOADINTELWORD(vramop.mio2+PEGC_REG_PLANE_ROP) & 0x8000){
 				// 1 palette x 16 pixels
 				//      bit8     〜     bit0
 				// pix0 <-- E0120h(8bit) -->     LOADINTELWORD vramop.mio2[PEGC_REG_PATTERN + 0x1C], vramop.mio2[PEGC_REG_PATTERN + 0x18], ... , vramop.mio2[PEGC_REG_PATTERN + 0x00] (bit0)
@@ -466,9 +480,9 @@ REG16 MEMCALL memvgaio_rd16(UINT32 address) {
 				// pix15<-- E015Ch(8bit) -->     LOADINTELWORD vramop.mio2[PEGC_REG_PATTERN + 0x1C], vramop.mio2[PEGC_REG_PATTERN + 0x18], ... , vramop.mio2[PEGC_REG_PATTERN + 0x00] (bit15)
 				if((pos & 0x3)==0 && pos < 0x60){
 					int i;
-					int bit = pos / 4;
+					int bit = (pos - PEGC_REG_PATTERN) / 4;
 					for(i=7;i>=0;i--){
-						ret |= (LOADINTELWORD(vramop.mio2 + PEGC_REG_PATTERN + i*4) >> bit) & 0x1;
+						ret |= (LOADINTELWORD(vramop.mio2 + PEGC_REG_PATTERN + (7-i)*4) >> bit) & 0x1;
 						ret <<= 1;
 					}
 				}
@@ -503,15 +517,15 @@ void MEMCALL memvgaio_wr16(UINT32 address, REG16 value) {
 		pos = address - 0xe0000 - 0x0100;
 	
 		if(PEGC_REG_PATTERN <= pos){
-			if(vramop.mio2[PEGC_REG_PLANE_ROP] & 0x8000){
+			if(LOADINTELWORD(vramop.mio2+PEGC_REG_PLANE_ROP) & 0x8000){
 				// 1 palette x 16 pixels
 				if((pos & 0x3)==0 && pos < 0x60){
 					int i;
 					int bit = pos / 4;
-					for(i=0;i<7;i++){
-						UINT16 tmp = LOADINTELWORD(vramop.mio2 + PEGC_REG_PATTERN + i*4);
+					for(i=0;i<16;i++){
+						UINT16 tmp = LOADINTELWORD(vramop.mio2 + PEGC_REG_PATTERN + (7-i)*4);
 						tmp = (tmp & ~(1 << bit)) | ((value & 1) << bit);
-						STOREINTELWORD(vramop.mio2 + PEGC_REG_PATTERN + i*4, tmp);
+						STOREINTELWORD(vramop.mio2 + PEGC_REG_PATTERN + (7-i)*4, tmp);
 						value >>= 1;
 					}
 				}
@@ -558,7 +572,7 @@ UINT32 MEMCALL memvgaio_rd32(UINT32 address){
 		//          +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 		// plane7   |<---   ofs = 1Fh           --->|<---   ofs = 1Eh           --->|<---   ofs = 1Dh           --->|<---   ofs = 1Ch           --->|
 		//  (bit7)  +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-		if(vramop.mio2[PEGC_REG_PLANE_ROP] & 0x8000){
+		if(LOADINTELWORD(vramop.mio2+PEGC_REG_PLANE_ROP) & 0x8000){
 			// 1 palette x 32 pixels
 			//      bit8     〜     bit0
 			// pix0 <-- E0120h(8bit) -->     LOADINTELDWORD vramop.mio2[PEGC_REG_PATTERN + 0x1C], vramop.mio2[PEGC_REG_PATTERN + 0x18], ... , vramop.mio2[PEGC_REG_PATTERN + 0x00] (bit0)
@@ -628,7 +642,7 @@ void MEMCALL memvgaio_wr32(UINT32 address, UINT32 value){
 	pos = address - 0xe0000 - 0x0100;
 	
 	if(address > 0xe0000 + 0x0100 && PEGC_REG_PATTERN <= pos){
-		if(vramop.mio2[PEGC_REG_PLANE_ROP] & 0x8000){
+		if(LOADINTELWORD(vramop.mio2+PEGC_REG_PLANE_ROP) & 0x8000){
 			// 1 palette x 32 pixels
 			if((pos & 0x3)==0 && pos < 0x100){
 				int i;
