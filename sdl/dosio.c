@@ -222,7 +222,7 @@ short file_attr(const OEMCHAR *path) {
     OEMCHAR testpath[MAX_PATH];
 
     attr |= FILEATTR_DIRECTORY;
-    file_cpyname(testpath, MAX_PATH, path);
+    file_cpyname(testpath, path, MAX_PATH);
     file_catname(testpath, "/_np2test", MAX_PATH);
     fh = file_create(path);
     if(fh) {
@@ -296,7 +296,7 @@ short file_getdatetime(FILEH handle, DOSDATE *dosdate, DOSTIME *dostime) {
 struct stat sb;
 
 #if defined(__LIBRETRO__)
-	if (fstat(handle, &sb) == 0) {
+	if (fstat(fileno(handle), &sb) == 0) {
 		if (cnv_sttime(&sb.st_mtime, dosdate, dostime) == SUCCESS) {
 			return(0);
 		}
