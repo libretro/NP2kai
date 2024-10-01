@@ -199,6 +199,7 @@ else ifeq ($(platform), tvos-arm64)
 	CXX = c++ -arch arm64 -isysroot $(IOSSDK)
 	CXX_VER = -std=c++11
 	LDFLAGS += -stdlib=libc++
+	CFLAGS += -Wno-incompatible-function-pointer-types
 
 # QNX
 else ifeq ($(platform), qnx)
