@@ -143,6 +143,7 @@ else ifeq ($(platform), osx)
 	LDFLAGS += -mmacosx-version-min=10.7 -stdlib=libc++
 	ifeq ($(CROSS_COMPILE),1)
 		ARCHFLAGS   = -target $(LIBRETRO_APPLE_PLATFORM) -isysroot $(LIBRETRO_APPLE_ISYSROOT)
+		CFLAGS     += -Wno-incompatible-function-pointer-types
 	endif
 	ifndef ($(NOUNIVERSAL))
 		CFLAGS	+= $(ARCHFLAGS)
