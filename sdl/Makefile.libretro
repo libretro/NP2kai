@@ -202,6 +202,9 @@ else ifeq ($(platform), tvos-arm64)
 	CXX_VER = -std=c++11
 	LDFLAGS += -stdlib=libc++
 	CFLAGS += -Wno-incompatible-function-pointer-types
+	CFLAGS += -mappletvos-version-min=11.0
+	CXXFLAGS += -mappletvos-version-min=11.0
+	LDFLAGS += -mappletvos-version-min=11.0
 
 # QNX
 else ifeq ($(platform), qnx)
