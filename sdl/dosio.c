@@ -296,11 +296,18 @@ short file_getdatetime(FILEH handle, DOSDATE *dosdate, DOSTIME *dostime) {
 struct stat sb;
 
 #if defined(__LIBRETRO__)
-	if (fstat(fileno(handle), &sb) == 0) {
-		if (cnv_sttime(&sb.st_mtime, dosdate, dostime) == SUCCESS) {
-			return(0);
-		}
+	// libretro doesn't provide file date/time API, so return dummy values
+	if (dosdate) {
+		dosdate->year = 2000;
+		dosdate->month = 1;
+		dosdate->day = 1;
 	}
+	if (dostime) {
+		dostime->hour = 0;
+		dostime->minute = 0;
+		dostime->second = 0;
+	}
+	return(0);
 #else
 	if (fstat(fileno(handle), &sb) == 0) {
 		if (cnv_sttime(&sb.st_mtime, dosdate, dostime) == SUCCESS) {
