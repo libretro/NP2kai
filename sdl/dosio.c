@@ -23,6 +23,10 @@
 #endif
 #endif
 
+#if defined(__LIBRETRO__)
+#include <streams/file_stream.h>
+#endif
+
 #if defined(_WINDOWS)
 static	OEMCHAR	curpath[MAX_PATH] = OEMTEXT(".\\");
 #else
@@ -296,11 +300,24 @@ short file_getdatetime(FILEH handle, DOSDATE *dosdate, DOSTIME *dostime) {
 struct stat sb;
 
 #if defined(__LIBRETRO__)
-	if (fstat(fileno(handle), &sb) == 0) {
+	const char* path = filestream_get_path(handle);
+	if (path && stat(path, &sb) == 0) {
 		if (cnv_sttime(&sb.st_mtime, dosdate, dostime) == SUCCESS) {
 			return(0);
 		}
 	}
+	// Fallback to use dummy values
+	if (dosdate) {
+		dosdate->year = 2000;
+		dosdate->month = 1;
+		dosdate->day = 1;
+	}
+	if (dostime) {
+		dostime->hour = 0;
+		dostime->minute = 0;
+		dostime->second = 0;
+	}
+	return(0);
 #else
 	if (fstat(fileno(handle), &sb) == 0) {
 		if (cnv_sttime(&sb.st_mtime, dosdate, dostime) == SUCCESS) {
