@@ -293,7 +293,7 @@ int pre_main(const char *argv) {
 
    xargv_cmd[PARAMCOUNT - 2] = NULL;
 
-   return 0;
+   return i;
 }
 
 void parse_cmdline(const char *argv) {
@@ -1696,7 +1696,8 @@ void retro_init (void)
 
 void retro_deinit(void)
 {
-   np2_end();
+   if (!firstcall)
+      np2_end();
 }
 
 void retro_reset (void)
@@ -1717,7 +1718,9 @@ void retro_run (void)
 {
    if(firstcall)
    {
-      pre_main(RPATH);
+      if (pre_main(RPATH) != SUCCESS) {
+         return;
+      }
       update_variables();
       pccore_cfgupdate();
       pccore_reset();
