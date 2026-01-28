@@ -1694,6 +1694,8 @@ void retro_init (void)
          log_cb(RETRO_LOG_INFO, "Frontend supports RGB565 (or XRGB8888).\n");
 }
 
+static int firstcall=1;
+
 void retro_deinit(void)
 {
    if (!firstcall)
@@ -1711,8 +1713,6 @@ void retro_reset (void)
    did_reset = true;
 }
 extern  void playretro();
-
-static int firstcall=1;
 
 void retro_run (void)
 {
