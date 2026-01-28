@@ -703,6 +703,11 @@ else
 	DISABLE_GCC_SECURITY_FLAGS = 1
 endif
 
+# webOS
+ifneq (,$(or $(findstring webos,$(CROSS_COMPILE)),$(findstring starfish,$(CROSS_COMPILE))))
+	CFLAGS += -Wno-incompatible-pointer-types
+endif
+
 CFLAGS += -DNP2KAI_GIT_TAG=\"$(GIT_TAG)\" -DNP2KAI_GIT_HASH=\"$(GIT_HASH)\"
 CXXFLAGS += -DNP2KAI_GIT_TAG=\"$(GIT_TAG)\" -DNP2KAI_GIT_HASH=\"$(GIT_HASH)\"
 
