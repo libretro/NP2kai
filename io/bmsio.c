@@ -69,7 +69,7 @@ void bmsio_set(void) {
 	bmsio.cfg = bmsiocfg;
 }
 
-void bmsio_reset(void) {
+void bmsio_reset(const NP2CFG *pConfig) {
 	if (bmsio.cfg.enabled) {
 		bmsio_setnumbanks(bmsio.cfg.numbanks);
 		bmsio_o00ec(0,0);

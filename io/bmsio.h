@@ -37,7 +37,7 @@ extern	_BMSIOWORK	bmsiowork;
 #endif
 
 void bmsio_set(void);
-void bmsio_reset(void);
+void bmsio_reset(const NP2CFG *pConfig);
 void bmsio_bind(void);
 
 #ifdef __cplusplus
