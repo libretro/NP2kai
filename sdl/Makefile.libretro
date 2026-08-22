@@ -844,6 +844,7 @@ SOURCES_C += 	$(NP2_PATH)/sdl/libretro/libretro-common/compat/compat_strcasestr.
 	$(NP2_PATH)/sdl/libretro/libretro-common/streams/stdin_stream.c \
 	$(NP2_PATH)/sdl/libretro/libretro-common/streams/trans_stream.c \
 	$(NP2_PATH)/sdl/libretro/libretro-common/streams/trans_stream_pipe.c \
+	$(NP2_PATH)/sdl/libretro/libretro-common/string/rstrtod.c \
 	$(NP2_PATH)/sdl/libretro/libretro-common/string/stdstring.c
 
 	ifeq ($(SUPPORT_NP2_THREAD), 1)
