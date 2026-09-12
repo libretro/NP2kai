@@ -136,7 +136,7 @@ ifneq ($(GIT_VERSION)," unknown")
 	COREFLAGS += -DNP2KAI_GIT_TAG=\"$(GIT_TAG)\" -DNP2KAI_GIT_HASH=\"$(GIT_HASH)\"
 endif
 include $(CLEAR_VARS)
-APP_STL := c++_shared
+APP_STL := c++_static
 LOCAL_MODULE    := retro
 LOCAL_SRC_FILES := $(SOURCES_C) $(SOURCES_CXX)
 LOCAL_CFLAGS    := $(COREFLAGS)
