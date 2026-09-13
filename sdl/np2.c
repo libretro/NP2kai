@@ -1,4 +1,5 @@
 #include <compiler.h>
+#include <ctype.h>
 #if defined(__LIBRETRO__)
 #include	"file_stream.h"
 #endif
@@ -274,11 +275,33 @@ static void processwait(UINT cnt) {
 	}
 }
 
+/* "scheme://..." - a URI names its target outright, whatever comes before
+ * the first separator. This matters on Android, where the Storage Access
+ * Framework hands the core a content:// URI: it starts with a letter, not a
+ * separator, so without this it is taken for a relative path and gets the
+ * content directory pasted in front of it, and the result opens nothing.
+ * Scheme syntax is RFC 3986: a letter, then letters, digits, '+', '-', '.'. */
+static int has_uri_scheme(const char *path)
+{
+  const char *p = path;
+
+  if (!isalpha((unsigned char)*p))
+    return 0;
+  for (p++; *p != '\0'; p++) {
+    if (isalnum((unsigned char)*p) || *p == '+' || *p == '-' || *p == '.')
+      continue;
+    return (p[0] == ':' && p[1] == '/' && p[2] == '/');
+  }
+  return 0;
+}
+
 int is_absolute(const char *path)
 {
   if (path[0] == '/' || path[1] == ':')
     return 1;
   if (path[0] == '\\' && path[1] == '\\')
+    return 1;
+  if (has_uri_scheme(path))
     return 1;
 #if defined (_3DS) || defined (PSP) || defined (VITA)
   char *pcolon = strchr(path, ':');
